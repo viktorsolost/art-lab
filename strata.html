@@ -127,6 +127,10 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         
+        // Offscreen canvas for persistent layers
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+        
         let width, height;
         let layers = [];
         let mouseX = 0, mouseY = 0;
@@ -189,6 +193,8 @@
             height = rect.height;
             canvas.width = width * 2;
             canvas.height = height * 2;
+            offCanvas.width = canvas.width;
+            offCanvas.height = canvas.height;
             ctx.scale(2, 2);
             generate();
         }
@@ -212,7 +218,8 @@
                 layers.push(layer);
             }
             
-            draw();
+            // Draw base layers to offscreen canvas
+            drawLayersToOffscreen();
         }
         
         function getRandomPaletteColor() {
@@ -227,13 +234,49 @@
             return palette[Math.floor(Math.random() * palette.length)];
         }
         
-        function draw() {
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0, 0, width, height);
+        function drawLayersToOffscreen() {
+            offCtx.fillStyle = '#050505';
+            offCtx.fillRect(0, 0, width, height);
             
             layers.forEach((layer, index) => {
-                drawLayer(layer, index);
+                drawLayerToOffscreen(layer, index);
             });
+        }
+        
+        function drawLayerToOffscreen(layer, index) {
+            offCtx.fillStyle = layer.color;
+            offCtx.globalAlpha = layer.opacity;
+            
+            const points = [];
+            const step = 2;
+            
+            for (let x = 0; x <= width; x += step) {
+                let y = layer.y;
+                
+                if (layer.type === 'wave') {
+                    const noiseVal = noise.noise2D(x * layer.noiseScale + layer.noiseOffset, index * 0.1);
+                    y += noiseVal * layer.height * 0.6;
+                } else {
+                    const noiseVal = noise.noise2D(layer.noiseOffset + x * layer.noiseScale, index * 0.1);
+                    y += noiseVal * layer.height * 0.3;
+                }
+                
+                points.push({ x, y });
+            }
+            
+            offCtx.beginPath();
+            offCtx.moveTo(0, height);
+            points.forEach(p => offCtx.lineTo(p.x, p.y));
+            offCtx.lineTo(width, height);
+            offCtx.closePath();
+            offCtx.fill();
+            
+            offCtx.globalAlpha = 1;
+        }
+        
+        function draw() {
+            // Copy from offscreen canvas
+            ctx.drawImage(offCanvas, 0, 0, width, height);
             
             if (currentMode === 'erosion') {
                 applyErosion();
@@ -287,31 +330,31 @@
             );
             
             if (dist < erosionRadius && (mouseX !== 0 || mouseY !== 0)) {
-                const intensity = (1 - dist / erosionRadius) * 0.015;
+                const intensity = (1 - dist / erosionRadius) * 0.03;
                 
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.globalAlpha = intensity;
+                offCtx.globalCompositeOperation = 'destination-out';
+                offCtx.globalAlpha = intensity;
                 
-                const gradient = ctx.createRadialGradient(
+                const gradient = offCtx.createRadialGradient(
                     mouseX, mouseY, 0,
                     mouseX, mouseY, erosionRadius
                 );
                 gradient.addColorStop(0, 'rgba(0,0,0,1)');
                 gradient.addColorStop(1, 'rgba(0,0,0,0)');
                 
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(mouseX, mouseY, erosionRadius, 0, Math.PI * 2);
-                ctx.fill();
+                offCtx.fillStyle = gradient;
+                offCtx.beginPath();
+                offCtx.arc(mouseX, mouseY, erosionRadius, 0, Math.PI * 2);
+                offCtx.fill();
                 
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.globalAlpha = 1;
+                offCtx.globalCompositeOperation = 'source-over';
+                offCtx.globalAlpha = 1;
             }
         }
         
         function drawSlices() {
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0, 0, width, height);
+            offCtx.fillStyle = '#050505';
+            offCtx.fillRect(0, 0, width, height);
             
             const sliceCount = 20 + Math.floor(Math.random() * 30);
             
@@ -324,17 +367,12 @@
                 const palette = ['#f4f1ea', '#d4cfc2', '#b8b39b', '#8c8673', '#1a1a1a', '#333333'];
                 const color = palette[Math.floor(Math.random() * palette.length)];
                 
-                ctx.fillStyle = color;
-                ctx.globalAlpha = opacity;
-                ctx.fillRect(x + noiseVal * 10, 0, sliceWidth, height);
+                offCtx.fillStyle = color;
+                offCtx.globalAlpha = opacity;
+                offCtx.fillRect(x + noiseVal * 10, 0, sliceWidth, height);
             }
             
-            ctx.globalAlpha = 1;
-            
-            // Apply erosion to slices too
-            if (mouseX !== 0 || mouseY !== 0) {
-                applyErosion();
-            }
+            offCtx.globalAlpha = 1;
         }
         
         function drawFlow() {
@@ -387,6 +425,7 @@
             document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-erosion').classList.add('active');
             generate();
+            draw();
         });
         
         document.getElementById('btn-slices').addEventListener('click', () => {
@@ -394,6 +433,7 @@
             document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
             document.getElementById('btn-slices').classList.add('active');
             drawSlices();
+            draw();
         });
         
         document.getElementById('btn-flow').addEventListener('click', () => {
