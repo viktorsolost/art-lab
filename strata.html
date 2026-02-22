@@ -423,6 +423,33 @@
             }
         });
         
+        // Touch support for mobile
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            mouseX = (touch.clientX - rect.left) * 2;
+            mouseY = (touch.clientY - rect.top) * 2;
+            
+            if (currentMode === 'erosion') {
+                draw();
+            } else if (currentMode === 'slices') {
+                drawSlices();
+            }
+        }, { passive: false });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            mouseX = (touch.clientX - rect.left) * 2;
+            mouseY = (touch.clientY - rect.top) * 2;
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            mouseX = 0;
+            mouseY = 0;
+        });
+        
         canvas.addEventListener('click', () => {
             if (currentMode === 'flow') {
                 // Stop flow animation on click and regenerate
