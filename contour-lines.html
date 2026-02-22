@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contour Line Art Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    color: #ccc;
+  }
+  #sidebar {
+    width: 290px;
+    min-width: 290px;
+    background: #111;
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    border-right: 1px solid #2a2a2a;
+  }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  #sidebar h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+  #sidebar .subtitle { font-size: 11px; color: #555; margin-bottom: 4px; line-height: 1.4; }
+  .section-label {
+    font-size: 10px; font-weight: 600; color: #555;
+    text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+  .label-row {
+    font-size: 11px; font-weight: 500; color: #999;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .label-left { display: flex; align-items: center; gap: 5px; }
+  .label-row span.val { color: #666; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .info-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #2a2a2a; color: #666;
+    font-size: 9px; font-weight: 700; font-style: italic; font-family: Georgia, serif;
+    cursor: help; position: relative; flex-shrink: 0;
+    transition: background 0.15s, color 0.15s; user-select: none;
+  }
+  .info-icon:hover { background: #444; color: #bbb; }
+  .info-icon .tooltip {
+    display: none; position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+    background: #222; border: 1px solid #3a3a3a; color: #bbb;
+    font-size: 11px; font-weight: 400; font-style: normal;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    padding: 8px 10px; border-radius: 6px; width: 200px; line-height: 1.45;
+    z-index: 100; white-space: normal; text-transform: none; letter-spacing: 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4); pointer-events: none;
+  }
+  .info-icon:hover .tooltip { display: block; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 4px;
+    background: #333; border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: #fff; border-radius: 50%; cursor: pointer;
+    border: 2px solid #111; box-shadow: 0 0 0 1px #444;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; background: #fff; border-radius: 50%;
+    cursor: pointer; border: 2px solid #111; box-shadow: 0 0 0 1px #444;
+  }
+  .divider { height: 1px; background: #2a2a2a; margin: 2px 0; }
+
+  .shape-row { display: flex; gap: 5px; }
+  .shape-btn {
+    flex: 1; padding: 7px 0; background: #222; border: 1.5px solid #333;
+    border-radius: 6px; color: #888; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.3px; cursor: pointer;
+    text-align: center; transition: all 0.15s;
+  }
+  .shape-btn:hover { border-color: #555; color: #bbb; }
+  .shape-btn.active { background: #fff; color: #111; border-color: #fff; }
+  .anim-btn {
+    flex: 1; padding: 7px 0; background: #222; border: 1.5px solid #333;
+    border-radius: 6px; color: #888; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.3px; cursor: pointer;
+    text-align: center; transition: all 0.15s;
+  }
+  .anim-btn:hover { border-color: #555; color: #bbb; }
+  .anim-btn.active { background: #fff; color: #111; border-color: #fff; }
+
+  .checkbox-group {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 12px; color: #aaa;
+  }
+  .checkbox-group input[type="checkbox"] { accent-color: #fff; cursor: pointer; width: 14px; height: 14px; }
+
+  .btn-row { display: flex; gap: 6px; }
+  .btn {
+    flex: 1; padding: 9px 10px; border: none; border-radius: 6px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #fff; color: #111; }
+  .btn-primary:hover { background: #e0e0e0; }
+  .btn-secondary { background: #2a2a2a; color: #ccc; }
+  .btn-secondary:hover { background: #363636; }
+  .btn-danger { background: #3a1a1a; color: #f66; }
+  .btn-danger:hover { background: #4a2020; }
+  .btn-accent { background: #1a2a1a; color: #6f6; }
+  .btn-accent:hover { background: #203a20; }
+
+  .upload-area {
+    border: 1.5px dashed #333; border-radius: 8px; padding: 12px;
+    text-align: center; cursor: pointer; transition: all 0.2s; position: relative;
+    overflow: hidden;
+  }
+  .upload-area:hover { border-color: #555; background: #1a1a1a; }
+  .upload-area.has-image { border-color: #4a4a4a; border-style: solid; padding: 4px; }
+  .upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-area .upload-label { font-size: 11px; color: #666; line-height: 1.4; }
+  .upload-area .upload-label strong { color: #999; }
+  .upload-area img { width: 100%; border-radius: 4px; display: block; }
+  .upload-actions { display: flex; gap: 6px; }
+
+  #canvas-wrapper {
+    flex: 1; display: flex; justify-content: center; align-items: center;
+    padding: 20px; position: relative;
+  }
+  #canvas-wrapper canvas { box-shadow: 0 4px 40px rgba(0,0,0,0.5); cursor: crosshair; }
+  .hint {
+    font-size: 10px; color: #555; line-height: 1.5;
+    margin-top: auto; padding-top: 8px; border-top: 1px solid #2a2a2a;
+  }
+  .progress-bar {
+    width: 100%; height: 3px; background: #2a2a2a;
+    border-radius: 2px; overflow: hidden; display: none;
+  }
+  .progress-bar .fill { height: 100%; background: #fff; width: 0%; transition: width 0.1s; }
+  .status { font-size: 11px; color: #555; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h1>Contour Lines</h1>
+  <div class="subtitle">Place attractors or upload an image, then generate flowing contour line art.</div>
+
+  <div class="section-label">Line Shape
+    <span class="info-icon">i<span class="tooltip">Choose how lines flow across the canvas: horizontal rows, vertical columns, concentric circles, or concentric squares.</span></span>
+  </div>
+  <div class="shape-row">
+    <div class="shape-btn active" data-shape="horizontal" onclick="setShape('horizontal')">— Horiz</div>
+    <div class="shape-btn" data-shape="vertical" onclick="setShape('vertical')">| Vert</div>
+    <div class="shape-btn" data-shape="circular" onclick="setShape('circular')">○ Circle</div>
+    <div class="shape-btn" data-shape="square" onclick="setShape('square')">□ Square</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span class="label-left">Line Density
+        <span class="info-icon">i<span class="tooltip">Number of parallel lines drawn. Higher = denser, more detailed artwork but slower to render.</span></span>
+      </span>
+      <span class="val" id="densityVal">200</span>
+    </div>
+    <input type="range" id="density" min="50" max="600" value="200" step="10">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span class="label-left">Distortion Strength
+        <span class="info-icon">i<span class="tooltip">How much attractor points warp nearby lines. Higher = deeper, more dramatic 3D bumps and recesses.</span></span>
+      </span>
+      <span class="val" id="strengthVal">80</span>
+    </div>
+    <input type="range" id="strength" min="10" max="250" value="80">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span class="label-left">Attractor Radius
+        <span class="info-icon">i<span class="tooltip">How far each attractor's influence reaches. Larger = broad gentle hills; smaller = tight sharp bumps.</span></span>
+      </span>
+      <span class="val" id="radiusVal">150</span>
+    </div>
+    <input type="range" id="radius" min="50" max="400" value="150">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span class="label-left">Noise Amount
+        <span class="info-icon">i<span class="tooltip">Perlin noise wobble for a natural hand-drawn feel instead of mathematically perfect curves.</span></span>
+      </span>
+      <span class="val" id="noiseVal">0.4</span>
+    </div>
+    <input type="range" id="noiseAmt" min="0" max="2" value="0.4" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span class="label-left">Line Weight
+        <span class="info-icon">i<span class="tooltip">Thickness of each line in pixels. Thinner = more delicate and allows more density detail.</span></span>
+      </span>
+      <span class="val" id="weightVal">0.7</span>
+    </div>
+    <input type="range" id="weight" min="0.3" max="2" value="0.7" step="0.1">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Animation
+    <span class="info-icon">i<span class="tooltip">Watch the artwork being drawn in real time. Choose a drawing style and speed to control the experience.</span></span>
+  </div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="animToggle">
+    <span>Enable animated drawing</span>
+  </label>
+
+  <div id="animControls" style="display:none">
+    <div class="control-group" style="margin-bottom:10px">
+      <div class="label-row">
+        <span class="label-left">Draw Mode
+          <span class="info-icon">i<span class="tooltip"><b>Pen stroke</b> — each line is drawn point by point, like a pen moving across paper.<br><b>Line reveal</b> — lines appear one by one, fading in top to bottom.<br><b>Sweep</b> — a curtain sweeps across revealing lines progressively.</span></span>
+        </span>
+      </div>
+      <div class="shape-row" style="margin-top:4px">
+        <div class="anim-btn active" data-amode="pen" onclick="setAnimMode('pen')">🖊 Pen</div>
+        <div class="anim-btn" data-amode="reveal" onclick="setAnimMode('reveal')">↓ Reveal</div>
+        <div class="anim-btn" data-amode="sweep" onclick="setAnimMode('sweep')">→ Sweep</div>
+      </div>
+    </div>
+    <div class="control-group">
+      <div class="label-row">
+        <span class="label-left">Speed
+          <span class="info-icon">i<span class="tooltip">How fast the animation plays. Slow speeds are meditative and great for screen recordings. Fast speeds complete quicker.</span></span>
+        </span>
+        <span class="val" id="animSpeedVal">Medium</span>
+      </div>
+      <input type="range" id="animSpeed" min="1" max="5" value="3" step="1">
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Image Mode
+    <span class="info-icon">i<span class="tooltip">Upload an image to use its brightness as displacement. Dark areas push lines, light areas stay flat — recreating the image in contour lines. Overrides attractor mode.</span></span>
+  </div>
+  <div class="upload-area" id="uploadArea">
+    <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)">
+    <div class="upload-label" id="uploadLabel"><strong>Click or drop</strong> an image<br>PNG, JPG — any size</div>
+  </div>
+  <div class="upload-actions" id="uploadActions" style="display:none">
+    <button class="btn btn-danger" style="font-size:10px;padding:6px 8px;" onclick="removeImage()">Remove Image</button>
+  </div>
+
+  <div class="control-group" id="imgStrengthGroup" style="display:none">
+    <div class="label-row">
+      <span class="label-left">Image Strength
+        <span class="info-icon">i<span class="tooltip">How strongly image brightness displaces lines. Higher = more dramatic depth.</span></span>
+      </span>
+      <span class="val" id="imgStrengthVal">60</span>
+    </div>
+    <input type="range" id="imgStrength" min="5" max="200" value="60">
+  </div>
+
+  <div class="control-group" id="imgContrastGroup" style="display:none">
+    <div class="label-row">
+      <span class="label-left">Image Contrast
+        <span class="info-icon">i<span class="tooltip">Boost or reduce contrast of the brightness map before displacement.</span></span>
+      </span>
+      <span class="val" id="imgContrastVal">1.5</span>
+    </div>
+    <input type="range" id="imgContrast" min="0.5" max="4" value="1.5" step="0.1">
+  </div>
+
+  <label class="checkbox-group" id="imgInvertGroup" style="display:none">
+    <input type="checkbox" id="imgInvert">
+    <span>Invert brightness</span>
+    <span class="info-icon" style="margin-left:auto">i<span class="tooltip">Swap raised vs recessed areas. Toggle depending on whether your image subject is light or dark.</span></span>
+  </label>
+
+  <div class="divider"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="generate()">Generate</button>
+    <button class="btn btn-danger" onclick="clearAll()">Clear</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-accent" onclick="randomize()">Randomize</button>
+    <button class="btn btn-secondary" onclick="exportPNG()">Export PNG</button>
+  </div>
+
+  <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
+  <div class="status" id="status"></div>
+
+  <div class="hint">
+    <strong>Click</strong> canvas to place attractors<br>
+    <strong>Drag</strong> attractors to reposition<br>
+    <strong>Right-click</strong> attractor to remove
+  </div>
+</div>
+
+<div id="canvas-wrapper"></div>
+
+<script>
+let attractors = [];
+let lines = [];
+let canvasW, canvasH;
+let animating = false;
+let animLineIndex = 0;
+let animPointIndex = 0;
+let animSweepX = 0;
+let animMode = 'pen';
+let draggingIdx = -1;
+let generated = false;
+let pg;
+let lineShape = 'horizontal';
+
+let uploadedImg = null;
+let uploadedImgDataURL = null;
+let brightnessMap = null;
+
+function setup() {
+  canvasW = Math.min(900, windowWidth - 350);
+  canvasH = Math.min(900, windowHeight - 60);
+  canvasW = Math.max(canvasW, 600);
+  canvasH = Math.max(canvasH, 600);
+  let cnv = createCanvas(canvasW, canvasH);
+  cnv.parent('canvas-wrapper');
+  cnv.mousePressed(canvasPressed);
+  cnv.mouseReleased(canvasReleased);
+  pg = createGraphics(canvasW, canvasH);
+  cnv.elt.addEventListener('contextmenu', (e) => { e.preventDefault(); removeAttractorAt(mouseX, mouseY); });
+  [['density','densityVal'],['strength','strengthVal'],['radius','radiusVal'],['noiseAmt','noiseVal'],['weight','weightVal'],['imgStrength','imgStrengthVal'],['imgContrast','imgContrastVal']].forEach(([id, vid]) => { let el = document.getElementById(id); if (el) el.addEventListener('input', function(){ document.getElementById(vid).textContent = this.value; }); });
+  drawCleanCanvas();
+  document.getElementById('animToggle').addEventListener('change', function() { document.getElementById('animControls').style.display = this.checked ? 'block' : 'none'; });
+  document.getElementById('animSpeed').addEventListener('input', function() { getAnimSpeed(); });
+}
+function setShape(s) { lineShape = s; document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active')); document.querySelector(`.shape-btn[data-shape="${s}"]`).classList.add('active'); generated = false; }
+function setAnimMode(m) { animMode = m; document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('active')); document.querySelector(`.anim-btn[data-amode="${m}"]`).classList.add('active'); }
+function getAnimSpeed() { let v = int(document.getElementById('animSpeed').value); let labels = { 1: 'Very Slow', 2: 'Slow', 3: 'Medium', 4: 'Fast', 5: 'Very Fast' }; document.getElementById('animSpeedVal').textContent = labels[v] || 'Medium'; return v; }
+function handleImageUpload(e) { let file = e.target.files[0]; if (!file) return; let reader = new FileReader(); reader.onload = function(ev) { uploadedImgDataURL = ev.target.result; let imgEl = document.createElement('img'); imgEl.onload = function() { let labelEl = document.getElementById('uploadLabel'); labelEl.innerHTML = ''; labelEl.appendChild(imgEl); document.getElementById('uploadArea').classList.add('has-image'); document.getElementById('uploadActions').style.display = 'flex'; document.getElementById('imgStrengthGroup').style.display = 'flex'; document.getElementById('imgContrastGroup').style.display = 'flex'; document.getElementById('imgInvertGroup').style.display = 'flex'; }; imgEl.src = uploadedImgDataURL; let nativeImg = new Image(); nativeImg.onload = function() { let g = createGraphics(nativeImg.width, nativeImg.height); g.drawingContext.drawImage(nativeImg, 0, 0); uploadedImg = g; buildBrightnessMap(); generated = false; setStatus('Image loaded — hit Generate'); }; nativeImg.src = uploadedImgDataURL; }; reader.readAsDataURL(file); }
+function removeImage() { uploadedImg = null; uploadedImgDataURL = null; brightnessMap = null; document.getElementById('uploadArea').classList.remove('has-image'); document.getElementById('uploadLabel').innerHTML = '<strong>Click or drop</strong> an image<br>PNG, JPG — any size'; document.getElementById('uploadActions').style.display = 'none'; document.getElementById('imgStrengthGroup').style.display = 'none'; document.getElementById('imgContrastGroup').style.display = 'none'; document.getElementById('imgInvertGroup').style.display = 'none'; document.getElementById('imageInput').value = ''; generated = false; setStatus('Image removed'); }
+function buildBrightnessMap() { if (!uploadedImg) return; let tmpG = createGraphics(canvasW, canvasH); tmpG.image(uploadedImg, 0, 0, canvasW, canvasH); tmpG.loadPixels(); brightnessMap = new Float32Array(canvasW * canvasH); for (let i = 0; i < canvasW * canvasH; i++) { let idx = i * 4; brightnessMap[i] = (0.299 * tmpG.pixels[idx] + 0.587 * tmpG.pixels[idx+1] + 0.114 * tmpG.pixels[idx+2]) / 255.0; } tmpG.remove(); }
+function sampleBrightness(x, y) { if (!brightnessMap) return 0; let ix = Math.round(constrain(x, 0, canvasW - 1)); let iy = Math.round(constrain(y, 0, canvasH - 1)); let v = brightnessMap[iy * canvasW + ix]; let contrast = float(document.getElementById('imgContrast').value); v = Math.pow(v, 1 / contrast); if (document.getElementById('imgInvert').checked) v = 1.0 - v; return v; }
+function drawCleanCanvas() { background(255); if (uploadedImg && !generated) { push(); drawingContext.globalAlpha = 0.15; image(uploadedImg, 0, 0, canvasW, canvasH); drawingContext.globalAlpha = 1.0; pop(); } for (let a of attractors) { noStroke(); fill(200, 200, 200, 180); ellipse(a.x, a.y, 8, 8); fill(150, 150, 150, 120); ellipse(a.x, a.y, 4, 4); } }
+function draw() { if (animating) { drawAnimatedFrame(); return; } if (!generated) drawCleanCanvas(); }
+function canvasPressed() { if (mouseButton === LEFT) { for (let i = 0; i < attractors.length; i++) { if (dist(mouseX, mouseY, attractors[i].x, attractors[i].y) < 15) { draggingIdx = i; return; } } if (mouseX > 0 && mouseX < canvasW && mouseY > 0 && mouseY < canvasH) { attractors.push({ x: mouseX, y: mouseY }); generated = false; } } }
+function canvasReleased() { draggingIdx = -1; }
+function mouseDragged() { if (draggingIdx >= 0 && mouseX > 0 && mouseX < canvasW && mouseY > 0 && mouseY < canvasH) { attractors[draggingIdx].x = mouseX; attractors[draggingIdx].y = mouseY; generated = false; } }
+function removeAttractorAt(mx, my) { for (let i = attractors.length - 1; i >= 0; i--) { if (dist(mx, my, attractors[i].x, attractors[i].y) < 15) { attractors.splice(i, 1); generated = false; return; } } }
+function getParams() { return { density: int(document.getElementById('density').value), strength: float(document.getElementById('strength').value), radius: float(document.getElementById('radius').value), noiseAmt: float(document.getElementById('noiseAmt').value), weight: float(document.getElementById('weight').value), animate: document.getElementById('animToggle').checked, imgStrength: float(document.getElementById('imgStrength').value), }; }
+function attractorDisp(px, py, p) { let d = 0; for (let a of attractors) { let dx = px - a.x, dy = py - a.y; let dd = Math.sqrt(dx*dx + dy*dy); if (dd < p.radius) { let t = dd / p.radius; let falloff = 0.5 * (1 + Math.cos(Math.PI * t)); d += -p.strength * falloff + Math.sin(t * Math.PI * 2) * p.strength * 0.15 * falloff; } } return d; }
+function imageDisp(px, py, p) { if (!brightnessMap) return 0; return -(1.0 - sampleBrightness(px, py)) * p.imgStrength; }
+function noiseDisp(px, py, ns, na) { return ((noise(px*0.005+ns, py*0.01+ns)-0.5)*2) * na * 12 + ((noise(px*0.02+ns+500, py*0.02)-0.5)) * na * 4; }
+function totalDisp(px, py, p, ns, useImg) { let d = useImg ? imageDisp(px, py, p) : attractorDisp(px, py, p); return d + noiseDisp(px, py, ns, p.noiseAmt); }
+function computeLines() { let p = getParams(); lines = []; let N = p.density; let ns = random(1000); let useImg = !!(uploadedImg && brightnessMap); let step = 3; if (lineShape === 'horizontal') { let sp = canvasH / Math.max(N - 1, 1); for (let i = 0; i < N; i++) { let baseY = i * sp; let pts = []; for (let x = 0; x <= canvasW; x += step) { let dy = totalDisp(x, baseY, p, ns, useImg); pts.push({ x, y: baseY + dy }); } lines.push(pts); } } else if (lineShape === 'vertical') { let sp = canvasW / Math.max(N - 1, 1); for (let i = 0; i < N; i++) { let baseX = i * sp; let pts = []; for (let y = 0; y <= canvasH; y += step) { let dx = totalDisp(baseX, y, p, ns, useImg); pts.push({ x: baseX + dx, y }); } lines.push(pts); } } else if (lineShape === 'circular') { let cx = canvasW / 2, cy = canvasH / 2; let maxR = Math.sqrt(cx*cx + cy*cy) + 20; let sp = maxR / N; let angStep = TWO_PI / 200; for (let i = 1; i <= N; i++) { let baseR = i * sp; let pts = []; for (let a = 0; a <= TWO_PI + angStep * 0.5; a += angStep) { let px = cx + Math.cos(a) * baseR; let py = cy + Math.sin(a) * baseR; let dr = totalDisp(px, py, p, ns, useImg); let r2 = baseR + dr; pts.push({ x: cx + Math.cos(a) * r2, y: cy + Math.sin(a) * r2 }); } lines.push(pts); } } else if (lineShape === 'square') { let cx = canvasW / 2, cy = canvasH / 2; let maxHalf = Math.max(canvasW, canvasH) * 0.55; let sp = maxHalf / N; for (let i = 1; i <= N; i++) { let h = i * sp; let pts = []; let corners = [[-h,-h],[h,-h],[h,h],[-h,h]]; let numPts = Math.max(80, Math.floor(h * 8 / step)); for (let j = 0; j <= numPts; j++) { let t = (j / numPts) * 4; let seg = Math.min(Math.floor(t), 3); let frac = t - seg; let c1 = corners[seg], c2 = corners[(seg+1)%4]; let px = cx + lerp(c1[0], c2[0], frac); let py = cy + lerp(c1[1], c2[1], frac); let nx = px - cx, ny = py - cy; let nl = Math.sqrt(nx*nx + ny*ny) || 1; nx /= nl; ny /= nl; let dr = totalDisp(px, py, p, ns, useImg); pts.push({ x: px + nx * dr, y: py + ny * dr }); } lines.push(pts); } } }
+function generate() { let useImg = !!(uploadedImg && brightnessMap); if (!useImg && attractors.length === 0) { setStatus('Place attractors or upload an image first!'); return; } if (useImg) buildBrightnessMap(); setStatus('Computing lines...'); setTimeout(() => { computeLines(); if (getParams().animate) startAnimation(); else renderAllLines(); }, 50); }
+function drawLine(gfx, pts, alpha, w) { gfx.strokeWeight(w); gfx.noFill(); gfx.stroke(0, 0, 0, alpha); gfx.beginShape(); for (let j = 0; j < pts.length; j++) { gfx.curveVertex(pts[j].x, pts[j].y); if (j === 0 || j === pts.length - 1) gfx.curveVertex(pts[j].x, pts[j].y); } gfx.endShape(); }
+function renderAllLines() { let p = getParams(); let progressBar = document.getElementById('progressBar'); let progressFill = document.getElementById('progressFill'); progressBar.style.display = 'block'; background(255); pg.clear(); pg.background(255); pg.drawingContext.save(); pg.drawingContext.beginPath(); pg.drawingContext.rect(0, 0, canvasW, canvasH); pg.drawingContext.clip(); let total = lines.length, batchSize = 25, idx = 0; function drawBatch() { let end = Math.min(idx + batchSize, total); for (let i = idx; i < end; i++) { drawLine(pg, lines[i], 175 + Math.sin(i*0.3)*25, p.weight); } idx = end; image(pg, 0, 0); progressFill.style.width = (idx/total*100)+'%'; setStatus('Drawing line ' + idx + ' / ' + total); if (idx < total) requestAnimationFrame(drawBatch); else { pg.drawingContext.restore(); generated = true; progressBar.style.display = 'none'; setStatus('Done — ' + total + ' lines rendered'); } } drawBatch(); }
+function startAnimation() { animating = true; animLineIndex = 0; animPointIndex = 0; animSweepX = 0; background(255); pg.clear(); pg.background(255); pg.drawingContext.save(); pg.drawingContext.beginPath(); pg.drawingContext.rect(0, 0, canvasW, canvasH); pg.drawingContext.clip(); setStatus('Animating...'); document.getElementById('progressBar').style.display = 'block'; }
+function getSpeedParams() { let spd = getAnimSpeed(); let penPPF = [4, 10, 22, 50, 120][spd - 1]; let revealLPF = [1, 2, 4, 8, 20][spd - 1]; let sweepPx = [2, 5, 10, 20, 40][spd - 1]; return { penPPF, revealLPF, sweepPx }; }
+function drawAnimatedFrame() { let p = getParams(); let sp = getSpeedParams(); if (animMode === 'pen') { drawAnimPen(p, sp); } else if (animMode === 'reveal') { drawAnimReveal(p, sp); } else if (animMode === 'sweep') { drawAnimSweep(p, sp); } }
+function drawAnimPen(p, sp) { if (animLineIndex >= lines.length) { finishAnimation(); return; } let pts = lines[animLineIndex]; let alpha = 175 + Math.sin(animLineIndex * 0.3) * 25; pg.strokeWeight(p.weight); pg.noFill(); pg.stroke(0, 0, 0, alpha); let startPt = animPointIndex; let endPt = Math.min(startPt + sp.penPPF, pts.length); image(pg, 0, 0); stroke(0, 0, 0, alpha); strokeWeight(p.weight); noFill(); drawingContext.save(); drawingContext.beginPath(); drawingContext.rect(0, 0, canvasW, canvasH); drawingContext.clip(); if (endPt >= 3) { beginShape(); for (let j = 0; j < endPt; j++) { curveVertex(pts[j].x, pts[j].y); if (j === 0 || j === endPt - 1) curveVertex(pts[j].x, pts[j].y); } endShape(); } drawingContext.restore(); animPointIndex = endPt; if (animPointIndex >= pts.length) { drawLine(pg, pts, alpha, p.weight); animLineIndex++; animPointIndex = 0; } let totalPts = lines.reduce((s, l) => s + l.length, 0); let donePts = 0; for (let i = 0; i < animLineIndex; i++) donePts += lines[i].length; donePts += animPointIndex; let pct = (donePts / totalPts * 100); document.getElementById('progressFill').style.width = pct + '%'; setStatus('Drawing line ' + (animLineIndex + 1) + ' / ' + lines.length); }
+function drawAnimReveal(p, sp) { if (animLineIndex >= lines.length) { finishAnimation(); return; } let end = Math.min(animLineIndex + sp.revealLPF, lines.length); for (let i = animLineIndex; i < end; i++) { drawLine(pg, lines[i], 175 + Math.sin(i * 0.3) * 25, p.weight); } animLineIndex = end; image(pg, 0, 0); document.getElementById('progressFill').style.width = (animLineIndex / lines.length * 100) + '%'; setStatus('Drawing line ' + animLineIndex + ' / ' + lines.length); if (animLineIndex >= lines.length) finishAnimation(); }
+function drawAnimSweep(p, sp) { let maxSweep = canvasW; if (animSweepX >= maxSweep) { finishAnimation(); return; } animSweepX = Math.min(animSweepX + sp.sweepPx, maxSweep); pg.clear(); pg.background(255); pg.drawingContext.save(); pg.drawingContext.beginPath(); pg.drawingContext.rect(0, 0, animSweepX, canvasH); pg.drawingContext.clip(); for (let i = 0; i < lines.length; i++) { drawLine(pg, lines[i], 175 + Math.sin(i * 0.3) * 25, p.weight); } pg.drawingContext.restore(); background(255); image(pg, 0, 0); stroke(0, 0, 0, 30); strokeWeight(1); line(animSweepX, 0, animSweepX, canvasH); document.getElementById('progressFill').style.width = (animSweepX / maxSweep * 100) + '%'; setStatus('Sweep ' + Math.round(animSweepX / maxSweep * 100) + '%'); if (animSweepX >= maxSweep) finishAnimation(); }
+function finishAnimation() { pg.clear(); pg.background(255); pg.drawingContext.save(); pg.drawingContext.beginPath(); pg.drawingContext.rect(0, 0, canvasW, canvasH); pg.drawingContext.clip(); let p = getParams(); for (let i = 0; i < lines.length; i++) { drawLine(pg, lines[i], 175 + Math.sin(i * 0.3) * 25, p.weight); } pg.drawingContext.restore(); image(pg, 0, 0); animating = false; generated = true; document.getElementById('progressBar').style.display = 'none'; setStatus('Done — ' + lines.length + ' lines rendered'); }
+function clearAll() { attractors = []; lines = []; generated = false; animating = false; animLineIndex = 0; animPointIndex = 0; animSweepX = 0; pg.clear(); pg.background(255); background(255); setStatus(''); document.getElementById('progressBar').style.display = 'none'; }
+function randomize() { attractors = []; let count = floor(random(3, 7)), pad = 120; for (let i = 0; i < count; i++) attractors.push({ x: random(pad, canvasW-pad), y: random(pad, canvasH-pad) }); generated = false; setStatus(count + ' random attractors placed'); setTimeout(generate, 100); }
+function exportPNG() { if (!generated) { setStatus('Generate art first!'); return; } saveCanvas('contour-art', 'png'); setStatus('PNG exported!'); }
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+function windowResized() { canvasW = Math.min(900, windowWidth - 350); canvasH = Math.min(900, windowHeight - 60); canvasW = Math.max(canvasW, 600); canvasH = Math.max(canvasH, 600); resizeCanvas(canvasW, canvasH); let oldPg = pg; pg = createGraphics(canvasW, canvasH); pg.image(oldPg, 0, 0); if (!generated) drawCleanCanvas(); }
+</script>
+</body>
+</html>

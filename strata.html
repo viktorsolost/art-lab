@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strata — Generative Layered Compositions</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 90vmin;
+            height: 70vmin;
+            border: 1px solid #1a1a1a;
+            background: #050505;
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        button {
+            background: transparent;
+            border: 1px solid #333;
+            color: #888;
+            padding: 10px 20px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            border-color: #666;
+            color: #ccc;
+        }
+        
+        button.active {
+            border-color: #e0e0e0;
+            color: #e0e0e0;
+        }
+        
+        .info {
+            position: fixed;
+            top: 30px;
+            left: 30px;
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #444;
+        }
+        
+        .title {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #444;
+            text-align: right;
+        }
+        
+        .hint {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: #333;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">STRATA // 001</div>
+    <div class="title">Generative<br>Layer System</div>
+    
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <div class="hint">move cursor to erode · click to regenerate</div>
+    
+    <div class="controls">
+        <button id="btn-erosion" class="active">Erosion</button>
+        <button id="btn-slices">Slices</button>
+        <button id="btn-flow">Flow</button>
+        <button id="btn-save">Save</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let layers = [];
+        let mouseX = 0, mouseY = 0;
+        let isMouseDown = false;
+        let currentMode = 'erosion';
+        let animationId;
+        let seed = Math.random() * 10000;
+        
+        // Simplex-like noise
+        class NoiseGenerator {
+            constructor() {
+                this.perm = [];
+                for (let i = 0; i < 512; i++) {
+                    this.perm[i] = Math.floor(Math.random() * 256);
+                }
+            }
+            
+            noise2D(x, y) {
+                const X = Math.floor(x) & 255;
+                const Y = Math.floor(y) & 255;
+                x -= Math.floor(x);
+                y -= Math.floor(y);
+                const u = this.fade(x);
+                const v = this.fade(y);
+                const A = this.perm[X] + Y;
+                const B = this.perm[X + 1] + Y;
+                return this.lerp(v,
+                    this.lerp(u, this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y)),
+                    this.lerp(u, this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1))
+                );
+            }
+            
+            fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+            lerp(t, a, b) { return a + t * (b - a); }
+            grad(hash, x, y) {
+                const h = hash & 3;
+                const u = h < 2 ? x : y;
+                const v = h < 2 ? y : x;
+                return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
+            }
+            
+            fbm(x, y, octaves = 4) {
+                let value = 0;
+                let amplitude = 0.5;
+                let frequency = 1;
+                for (let i = 0; i < octaves; i++) {
+                    value += amplitude * this.noise2D(x * frequency, y * frequency);
+                    amplitude *= 0.5;
+                    frequency *= 2;
+                }
+                return value;
+            }
+        }
+        
+        const noise = new NoiseGenerator();
+        
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            ctx.scale(2, 2);
+            generate();
+        }
+        
+        function generate() {
+            seed = Math.random() * 10000;
+            layers = [];
+            
+            const layerCount = 8 + Math.floor(Math.random() * 6);
+            
+            for (let i = 0; i < layerCount; i++) {
+                const layer = {
+                    y: (i / layerCount) * height,
+                    height: height / layerCount * (0.8 + Math.random() * 0.4),
+                    opacity: 0.03 + Math.random() * 0.08,
+                    color: getRandomPaletteColor(),
+                    noiseScale: 0.002 + Math.random() * 0.004,
+                    noiseOffset: Math.random() * 1000,
+                    type: Math.random() > 0.5 ? 'horizontal' : 'wave'
+                };
+                layers.push(layer);
+            }
+            
+            draw();
+        }
+        
+        function getRandomPaletteColor() {
+            const palettes = [
+                ['#f4f1ea', '#e8e4dc', '#d4cfc2', '#b8b39b', '#8c8673'],
+                ['#1a1a1a', '#2d2d2d', '#404040', '#525252', '#666666'],
+                ['#c9b8a8', '#a69080', '#7d6b5d', '#5c4d3f', '#3d3229'],
+                ['#e0dcd4', '#c4bfb4', '#a39e90', '#7a7166', '#565148'],
+                ['#d4c4b0', '#bba88f', '#9c866a', '#75624d', '#4e3f33']
+            ];
+            const palette = palettes[Math.floor(Math.random() * palettes.length)];
+            return palette[Math.floor(Math.random() * palette.length)];
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, width, height);
+            
+            layers.forEach((layer, index) => {
+                drawLayer(layer, index);
+            });
+            
+            if (currentMode === 'erosion') {
+                applyErosion();
+            }
+        }
+        
+        function drawLayer(layer, index) {
+            ctx.fillStyle = layer.color;
+            ctx.globalAlpha = layer.opacity;
+            
+            const points = [];
+            const step = 2;
+            
+            for (let x = 0; x <= width; x += step) {
+                let y = layer.y;
+                
+                if (layer.type === 'wave') {
+                    const noiseVal = noise.fbm(
+                        (x + layer.noiseOffset) * layer.noiseScale,
+                        index * 0.5,
+                        3
+                    );
+                    y += noiseVal * layer.height * 0.6;
+                } else {
+                    const noiseVal = noise.fbm(
+                        layer.noiseOffset * 0.1,
+                        (x + layer.noiseOffset) * layer.noiseScale * 0.5,
+                        2
+                    );
+                    y += noiseVal * layer.height * 0.3;
+                }
+                
+                points.push({ x, y });
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(width, height);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.globalAlpha = 1;
+        }
+        
+        function applyErosion() {
+            const erosionRadius = 80;
+            const dist = Math.sqrt(
+                Math.pow((mouseX / width) * erosionRadius * 2 - erosionRadius, 2) +
+                Math.pow((mouseY / height) * erosionRadius * 2 - erosionRadius, 2)
+            );
+            
+            if (dist < erosionRadius && (mouseX !== 0 || mouseY !== 0)) {
+                const intensity = (1 - dist / erosionRadius) * 0.015;
+                
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.globalAlpha = intensity;
+                
+                const gradient = ctx.createRadialGradient(
+                    mouseX, mouseY, 0,
+                    mouseX, mouseY, erosionRadius
+                );
+                gradient.addColorStop(0, 'rgba(0,0,0,1)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, erosionRadius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        function drawSlices() {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, width, height);
+            
+            const sliceCount = 20 + Math.floor(Math.random() * 30);
+            
+            for (let i = 0; i < sliceCount; i++) {
+                const x = (i / sliceCount) * width;
+                const sliceWidth = 2 + Math.random() * 8;
+                const noiseVal = noise.fbm(i * 0.1 + seed, 0, 4);
+                const opacity = 0.02 + Math.abs(noiseVal) * 0.1;
+                
+                const palette = ['#f4f1ea', '#d4cfc2', '#b8b39b', '#8c8673', '#1a1a1a', '#333333'];
+                const color = palette[Math.floor(Math.random() * palette.length)];
+                
+                ctx.fillStyle = color;
+                ctx.globalAlpha = opacity;
+                ctx.fillRect(x + noiseVal * 10, 0, sliceWidth, height);
+            }
+            
+            ctx.globalAlpha = 1;
+            
+            // Apply erosion to slices too
+            if (mouseX !== 0 || mouseY !== 0) {
+                applyErosion();
+            }
+        }
+        
+        function drawFlow() {
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, width, height);
+            
+            const time = Date.now() * 0.0001;
+            const particleCount = 150;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const startX = (noise.noise2D(i * 0.1, seed) * 0.5 + 0.5) * width;
+                const startY = (noise.noise2D(i * 0.1 + 100, seed) * 0.5 + 0.5) * height;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                
+                let x = startX;
+                let y = startY;
+                
+                for (let j = 0; j < 50; j++) {
+                    const angle = noise.noise2D(x * 0.005, y * 0.005 + time) * Math.PI * 4;
+                    x += Math.cos(angle) * 8;
+                    y += Math.sin(angle) * 8;
+                    
+                    if (x < 0 || x > width || y < 0 || y > height) break;
+                    
+                    ctx.lineTo(x, y);
+                }
+                
+                const palette = ['#f4f1ea', '#c4bfb4', '#8c8673', '#666666', '#e0dcd4'];
+                ctx.strokeStyle = palette[Math.floor(Math.random() * palette.length)];
+                ctx.globalAlpha = 0.03 + Math.random() * 0.03;
+                ctx.lineWidth = 0.5 + Math.random() * 1.5;
+                ctx.stroke();
+            }
+            
+            ctx.globalAlpha = 1;
+        }
+        
+        function saveImage() {
+            const link = document.createElement('a');
+            link.download = `strata-${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        // Event listeners
+        document.getElementById('btn-erosion').addEventListener('click', () => {
+            currentMode = 'erosion';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-erosion').classList.add('active');
+            generate();
+        });
+        
+        document.getElementById('btn-slices').addEventListener('click', () => {
+            currentMode = 'slices';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-slices').classList.add('active');
+            drawSlices();
+        });
+        
+        document.getElementById('btn-flow').addEventListener('click', () => {
+            currentMode = 'flow';
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-flow').classList.add('active');
+            
+            function animate() {
+                if (currentMode !== 'flow') return;
+                drawFlow();
+                animationId = requestAnimationFrame(animate);
+            }
+            animate();
+        });
+        
+        document.getElementById('btn-save').addEventListener('click', saveImage);
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            if (currentMode === 'erosion') {
+                draw();
+            } else if (currentMode === 'slices') {
+                drawSlices();
+            }
+        });
+        
+        canvas.addEventListener('click', () => {
+            if (currentMode === 'flow') {
+                // Stop flow animation on click and regenerate
+                cancelAnimationFrame(animationId);
+            }
+            generate();
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            mouseX = 0;
+            mouseY = 0;
+        });
+        
+        window.addEventListener('resize', resize);
+        
+        // Initialize
+        resize();
+    </script>
+</body>
+</html>
