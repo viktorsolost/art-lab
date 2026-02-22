@@ -280,7 +280,7 @@
         }
         
         function applyErosion() {
-            const erosionRadius = 80;
+            const erosionRadius = 160;
             const dist = Math.sqrt(
                 Math.pow((mouseX / width) * erosionRadius * 2 - erosionRadius, 2) +
                 Math.pow((mouseY / height) * erosionRadius * 2 - erosionRadius, 2)
@@ -413,8 +413,8 @@
         
         canvas.addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
-            mouseX = e.clientX - rect.left;
-            mouseY = e.clientY - rect.top;
+            mouseX = (e.clientX - rect.left) * 2;
+            mouseY = (e.clientY - rect.top) * 2;
             
             if (currentMode === 'erosion') {
                 draw();
