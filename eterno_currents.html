@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eterno Currents | Generative Flow</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #444;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        #canvas-container {
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.5);
+            pointer-events: none;
+            font-size: 12px;
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .key {
+            color: #fff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="controls">
+        <span class="key">CLICK</span> to reset & new palette<br>
+        <span class="key">S</span> to save image<br>
+        <span class="key">SPACE</span> to pause/resume
+    </div>
+
+    <script>
+        let particles = [];
+        let flowField;
+        let cols, rows;
+        let scale = 10; // Smaller scale for finer detail
+        let zOff = 0;
+        let inc = 0.1;
+        let particleCount = 2000;
+        let palette;
+        let currentPaletteIndex = 0;
+        let isPaused = false;
+
+        // Palettes
+        const palettes = [
+            // Eterno Void (Dark)
+            { bg: '#050505', colors: ['#3498DB', '#9B59B6', '#E74C3C', '#F1C40F'] },
+            // Neon Tokyo
+            { bg: '#1a1a2e', colors: ['#e94560', '#0f3460', '#16213e', '#533483'] },
+            // Vhils Grit (Monochrome)
+            { bg: '#dddddd', colors: ['#111111', '#333333', '#555555', '#999999'] },
+            // Digital Sunset
+            { bg: '#2d1b2e', colors: ['#b65d69', '#f2a365', '#ececec', '#444444'] }
+        ];
+
+        function setup() {
+            let cnv = createCanvas(windowWidth, windowHeight);
+            cnv.id('myCanvas');
+            pixelDensity(1); // Performance optimization for many particles
+            background(palettes[0].bg);
+            palette = palettes[0].colors;
+            
+            cols = floor(width / scale);
+            rows = floor(height / scale);
+            flowField = new Array(cols * rows);
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function draw() {
+            if (isPaused) return;
+
+            let yoff = 0;
+            for (let y = 0; y < rows; y++) {
+                let xoff = 0;
+                for (let x = 0; x < cols; x++) {
+                    let index = x + y * cols;
+                    let angle = noise(xoff, yoff, zOff) * TWO_PI * 4;
+                    let v = p5.Vector.fromAngle(angle);
+                    v.setMag(1);
+                    flowField[index] = v;
+                    xoff += inc;
+                }
+                yoff += inc;
+            }
+            zOff += 0.003;
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].follow(flowField);
+                particles[i].update();
+                particles[i].edges();
+                particles[i].show();
+            }
+        }
+
+        class Particle {
+            constructor() {
+                this.pos = createVector(random(width), random(height));
+                this.vel = createVector(0, 0);
+                this.acc = createVector(0, 0);
+                this.maxSpeed = 2;
+                this.prevPos = this.pos.copy();
+                this.color = color(random(palette));
+                this.color.setAlpha(15); // Very transparent for slow buildup
+            }
+
+            follow(vectors) {
+                let x = floor(this.pos.x / scale);
+                let y = floor(this.pos.y / scale);
+                let index = x + y * cols;
+                let force = vectors[index];
+                this.applyForce(force);
+            }
+
+            applyForce(force) {
+                this.acc.add(force);
+            }
+
+            update() {
+                this.vel.add(this.acc);
+                this.vel.limit(this.maxSpeed);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+            }
+
+            show() {
+                stroke(this.color);
+                strokeWeight(1);
+                line(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+                this.updatePrev();
+            }
+
+            updatePrev() {
+                this.prevPos.x = this.pos.x;
+                this.prevPos.y = this.pos.y;
+            }
+
+            edges() {
+                if (this.pos.x > width) {
+                    this.pos.x = 0;
+                    this.updatePrev();
+                }
+                if (this.pos.x < 0) {
+                    this.pos.x = width;
+                    this.updatePrev();
+                }
+                if (this.pos.y > height) {
+                    this.pos.y = 0;
+                    this.updatePrev();
+                }
+                if (this.pos.y < 0) {
+                    this.pos.y = height;
+                    this.updatePrev();
+                }
+            }
+        }
+
+        function mousePressed() {
+            currentPaletteIndex = (currentPaletteIndex + 1) % palettes.length;
+            let p = palettes[currentPaletteIndex];
+            palette = p.colors;
+            background(p.bg);
+            
+            // Reset particles with new colors
+            particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+            // New noise seed
+            noiseSeed(millis());
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            background(palettes[currentPaletteIndex].bg);
+        }
+        
+        function keyPressed() {
+            if (key === 's' || key === 'S') saveCanvas('eterno_flow', 'png');
+            if (key === ' ') isPaused = !isPaused;
+        }
+    </script>
+</body>
+</html>
