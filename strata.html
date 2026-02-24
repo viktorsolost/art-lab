@@ -1,512 +1,1135 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strata — Generative Layered Compositions</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400&display=swap');
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            background: #0a0a0a;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            font-family: 'IBM Plex Mono', monospace;
-            color: #e0e0e0;
-            overflow: hidden;
-        }
-        
-        #canvas-container {
-            position: relative;
-            width: 90vmin;
-            height: 70vmin;
-            border: 1px solid #1a1a1a;
-            background: #050505;
-        }
-        
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-        
-        .controls {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            z-index: 100;
-        }
-        
-        button {
-            background: transparent;
-            border: 1px solid #333;
-            color: #888;
-            padding: 10px 20px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 11px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        button:hover {
-            border-color: #666;
-            color: #ccc;
-        }
-        
-        button.active {
-            border-color: #e0e0e0;
-            color: #e0e0e0;
-        }
-        
-        .info {
-            position: fixed;
-            top: 30px;
-            left: 30px;
-            font-size: 10px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #444;
-        }
-        
-        .title {
-            position: fixed;
-            top: 30px;
-            right: 30px;
-            font-size: 10px;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #444;
-            text-align: right;
-        }
-        
-        .hint {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 9px;
-            letter-spacing: 1px;
-            color: #333;
-            text-transform: uppercase;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strata — Generative Geological Layers</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a09;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    color: #999;
+  }
+
+  #sidebar {
+    width: 300px;
+    min-width: 300px;
+    background: #0d0d0c;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    border-right: 1px solid #1a1a18;
+  }
+  #sidebar::-webkit-scrollbar { width: 3px; }
+  #sidebar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background: #2a2a26; border-radius: 2px; }
+
+  .brand {
+    display: flex; align-items: baseline; gap: 10px;
+    margin-bottom: 2px;
+  }
+  .brand h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px; font-weight: 400; color: #e8e4dc;
+    letter-spacing: 1px;
+  }
+  .brand .edition {
+    font-size: 9px; color: #4a4a42; letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .subtitle {
+    font-size: 10px; color: #3a3a34; line-height: 1.5;
+    letter-spacing: 0.5px;
+  }
+
+  .section-label {
+    font-size: 9px; font-weight: 500; color: #4a4a42;
+    text-transform: uppercase; letter-spacing: 2px; margin-top: 6px;
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+  .label-row {
+    font-size: 10px; font-weight: 400; color: #6a6a60;
+    letter-spacing: 0.5px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .label-row .val { color: #4a4a42; font-size: 10px; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 2px;
+    background: #222220; border-radius: 1px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    background: #c9b8a8; border-radius: 50%; cursor: pointer;
+    border: 2px solid #0d0d0c;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; background: #c9b8a8; border-radius: 50%;
+    cursor: pointer; border: 2px solid #0d0d0c;
+  }
+
+  .divider { height: 1px; background: #1a1a18; margin: 4px 0; }
+
+  /* Palette selector */
+  .palette-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .palette-swatch {
+    width: 100%; height: 24px; border-radius: 4px; cursor: pointer;
+    display: flex; overflow: hidden; border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .palette-swatch:hover { transform: scale(1.02); }
+  .palette-swatch.active { border-color: #c9b8a8; }
+  .palette-swatch .swatch-color { flex: 1; }
+
+  /* Mode buttons */
+  .mode-row { display: flex; gap: 5px; }
+  .mode-btn {
+    flex: 1; padding: 8px 0; background: #141412; border: 1px solid #222220;
+    border-radius: 5px; color: #5a5a52; font-family: 'DM Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer;
+    text-align: center; transition: all 0.2s;
+  }
+  .mode-btn:hover { border-color: #3a3a34; color: #8a8a80; }
+  .mode-btn.active { background: #c9b8a8; color: #0d0d0c; border-color: #c9b8a8; }
+
+  .checkbox-group {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 10px; color: #6a6a60;
+    letter-spacing: 0.5px;
+  }
+  .checkbox-group input[type="checkbox"] {
+    accent-color: #c9b8a8; cursor: pointer; width: 13px; height: 13px;
+  }
+
+  .btn-row { display: flex; gap: 6px; }
+  .btn {
+    flex: 1; padding: 10px 10px; border: none; border-radius: 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #c9b8a8; color: #0d0d0c; }
+  .btn-primary:hover { background: #d4c4b0; }
+  .btn-secondary { background: #1a1a18; color: #6a6a60; }
+  .btn-secondary:hover { background: #222220; }
+  .btn-accent { background: #1a1e1a; color: #7a9a6a; }
+  .btn-accent:hover { background: #202820; }
+  .btn-danger { background: #1e1616; color: #b07070; }
+  .btn-danger:hover { background: #261a1a; }
+
+  .status {
+    font-size: 9px; color: #3a3a34; min-height: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  .hint {
+    font-size: 9px; color: #2a2a26; line-height: 1.6;
+    margin-top: auto; padding-top: 10px; border-top: 1px solid #1a1a18;
+    letter-spacing: 0.3px;
+  }
+  .hint strong { color: #4a4a42; font-weight: 500; }
+
+  /* Canvas area */
+  #canvas-area {
+    flex: 1; display: flex; justify-content: center; align-items: center;
+    padding: 30px; position: relative;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(40,35,28,0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 50%, rgba(28,30,35,0.2) 0%, transparent 60%),
+      #0a0a09;
+  }
+  #canvas-area canvas {
+    box-shadow: 0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+    cursor: crosshair;
+  }
+
+  /* Progress */
+  .progress-bar {
+    width: 100%; height: 2px; background: #1a1a18;
+    border-radius: 1px; overflow: hidden; display: none;
+  }
+  .progress-bar .fill {
+    height: 100%; background: #c9b8a8; width: 0%;
+    transition: width 0.15s;
+  }
+</style>
 </head>
 <body>
-    <div class="info">STRATA // 001</div>
-    <div class="title">Generative<br>Layer System</div>
-    
-    <div id="canvas-container">
-        <canvas id="canvas"></canvas>
-    </div>
-    
-    <div class="hint">move cursor to erode · click to regenerate</div>
-    
-    <div class="controls">
-        <button id="btn-erosion" class="active">Erosion</button>
-        <button id="btn-slices">Slices</button>
-        <button id="btn-flow">Flow</button>
-        <button id="btn-save">Save</button>
-    </div>
 
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Offscreen canvas for persistent layers
-        const offCanvas = document.createElement('canvas');
-        const offCtx = offCanvas.getContext('2d');
-        
-        let width, height;
-        let layers = [];
-        let mouseX = 0, mouseY = 0;
-        let isMouseDown = false;
-        let currentMode = 'erosion';
-        let animationId;
-        let seed = Math.random() * 10000;
-        
-        // Simplex-like noise
-        class NoiseGenerator {
-            constructor() {
-                this.perm = [];
-                for (let i = 0; i < 512; i++) {
-                    this.perm[i] = Math.floor(Math.random() * 256);
-                }
-            }
-            
-            noise2D(x, y) {
-                const X = Math.floor(x) & 255;
-                const Y = Math.floor(y) & 255;
-                x -= Math.floor(x);
-                y -= Math.floor(y);
-                const u = this.fade(x);
-                const v = this.fade(y);
-                const A = this.perm[X] + Y;
-                const B = this.perm[X + 1] + Y;
-                return this.lerp(v,
-                    this.lerp(u, this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y)),
-                    this.lerp(u, this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1))
-                );
-            }
-            
-            fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-            lerp(t, a, b) { return a + t * (b - a); }
-            grad(hash, x, y) {
-                const h = hash & 3;
-                const u = h < 2 ? x : y;
-                const v = h < 2 ? y : x;
-                return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
-            }
-            
-            fbm(x, y, octaves = 4) {
-                let value = 0;
-                let amplitude = 0.5;
-                let frequency = 1;
-                for (let i = 0; i < octaves; i++) {
-                    value += amplitude * this.noise2D(x * frequency, y * frequency);
-                    amplitude *= 0.5;
-                    frequency *= 2;
-                }
-                return value;
-            }
-        }
-        
-        const noise = new NoiseGenerator();
-        
-        function resize() {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            width = rect.width;
-            height = rect.height;
-            canvas.width = width * 2;
-            canvas.height = height * 2;
-            offCanvas.width = canvas.width;
-            offCanvas.height = canvas.height;
-            ctx.scale(2, 2);
-            generate();
-        }
-        
-        function generate() {
-            seed = Math.random() * 10000;
-            layers = [];
-            
-            const layerCount = 8 + Math.floor(Math.random() * 6);
-            
-            for (let i = 0; i < layerCount; i++) {
-                const layer = {
-                    y: (i / layerCount) * height,
-                    height: height / layerCount * (0.8 + Math.random() * 0.4),
-                    opacity: 0.03 + Math.random() * 0.08,
-                    color: getRandomPaletteColor(),
-                    noiseScale: 0.002 + Math.random() * 0.004,
-                    noiseOffset: Math.random() * 1000,
-                    type: Math.random() > 0.5 ? 'horizontal' : 'wave'
-                };
-                layers.push(layer);
-            }
-            
-            // Draw base layers to offscreen canvas
-            drawLayersToOffscreen();
-        }
-        
-        function getRandomPaletteColor() {
-            const palettes = [
-                ['#f4f1ea', '#e8e4dc', '#d4cfc2', '#b8b39b', '#8c8673'],
-                ['#1a1a1a', '#2d2d2d', '#404040', '#525252', '#666666'],
-                ['#c9b8a8', '#a69080', '#7d6b5d', '#5c4d3f', '#3d3229'],
-                ['#e0dcd4', '#c4bfb4', '#a39e90', '#7a7166', '#565148'],
-                ['#d4c4b0', '#bba88f', '#9c866a', '#75624d', '#4e3f33']
-            ];
-            const palette = palettes[Math.floor(Math.random() * palettes.length)];
-            return palette[Math.floor(Math.random() * palette.length)];
-        }
-        
-        function drawLayersToOffscreen() {
-            offCtx.fillStyle = '#050505';
-            offCtx.fillRect(0, 0, width, height);
-            
-            layers.forEach((layer, index) => {
-                drawLayerToOffscreen(layer, index);
-            });
-        }
-        
-        function drawLayerToOffscreen(layer, index) {
-            offCtx.fillStyle = layer.color;
-            offCtx.globalAlpha = layer.opacity;
-            
-            const points = [];
-            const step = 2;
-            
-            for (let x = 0; x <= width; x += step) {
-                let y = layer.y;
-                
-                if (layer.type === 'wave') {
-                    const noiseVal = noise.noise2D(x * layer.noiseScale + layer.noiseOffset, index * 0.1);
-                    y += noiseVal * layer.height * 0.6;
-                } else {
-                    const noiseVal = noise.noise2D(layer.noiseOffset + x * layer.noiseScale, index * 0.1);
-                    y += noiseVal * layer.height * 0.3;
-                }
-                
-                points.push({ x, y });
-            }
-            
-            offCtx.beginPath();
-            offCtx.moveTo(0, height);
-            points.forEach(p => offCtx.lineTo(p.x, p.y));
-            offCtx.lineTo(width, height);
-            offCtx.closePath();
-            offCtx.fill();
-            
-            offCtx.globalAlpha = 1;
-        }
-        
-        function draw() {
-            // Copy from offscreen canvas
-            ctx.drawImage(offCanvas, 0, 0, width, height);
-            
-            if (currentMode === 'erosion') {
-                applyErosion();
-            }
-        }
-        
-        function drawLayer(layer, index) {
-            ctx.fillStyle = layer.color;
-            ctx.globalAlpha = layer.opacity;
-            
-            const points = [];
-            const step = 2;
-            
-            for (let x = 0; x <= width; x += step) {
-                let y = layer.y;
-                
-                if (layer.type === 'wave') {
-                    const noiseVal = noise.fbm(
-                        (x + layer.noiseOffset) * layer.noiseScale,
-                        index * 0.5,
-                        3
-                    );
-                    y += noiseVal * layer.height * 0.6;
-                } else {
-                    const noiseVal = noise.fbm(
-                        layer.noiseOffset * 0.1,
-                        (x + layer.noiseOffset) * layer.noiseScale * 0.5,
-                        2
-                    );
-                    y += noiseVal * layer.height * 0.3;
-                }
-                
-                points.push({ x, y });
-            }
-            
-            ctx.beginPath();
-            ctx.moveTo(0, height);
-            points.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.lineTo(width, height);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.globalAlpha = 1;
-        }
-        
-        function applyErosion() {
-            const erosionRadius = 160;
-            const dist = Math.sqrt(
-                Math.pow((mouseX / width) * erosionRadius * 2 - erosionRadius, 2) +
-                Math.pow((mouseY / height) * erosionRadius * 2 - erosionRadius, 2)
-            );
-            
-            if (dist < erosionRadius && (mouseX !== 0 || mouseY !== 0)) {
-                const intensity = (1 - dist / erosionRadius) * 0.03;
-                
-                offCtx.globalCompositeOperation = 'destination-out';
-                offCtx.globalAlpha = intensity;
-                
-                const gradient = offCtx.createRadialGradient(
-                    mouseX, mouseY, 0,
-                    mouseX, mouseY, erosionRadius
-                );
-                gradient.addColorStop(0, 'rgba(0,0,0,1)');
-                gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                
-                offCtx.fillStyle = gradient;
-                offCtx.beginPath();
-                offCtx.arc(mouseX, mouseY, erosionRadius, 0, Math.PI * 2);
-                offCtx.fill();
-                
-                offCtx.globalCompositeOperation = 'source-over';
-                offCtx.globalAlpha = 1;
-            }
-        }
-        
-        function drawSlices() {
-            offCtx.fillStyle = '#050505';
-            offCtx.fillRect(0, 0, width, height);
-            
-            const sliceCount = 20 + Math.floor(Math.random() * 30);
-            
-            for (let i = 0; i < sliceCount; i++) {
-                const x = (i / sliceCount) * width;
-                const sliceWidth = 2 + Math.random() * 8;
-                const noiseVal = noise.fbm(i * 0.1 + seed, 0, 4);
-                const opacity = 0.02 + Math.abs(noiseVal) * 0.1;
-                
-                const palette = ['#f4f1ea', '#d4cfc2', '#b8b39b', '#8c8673', '#1a1a1a', '#333333'];
-                const color = palette[Math.floor(Math.random() * palette.length)];
-                
-                offCtx.fillStyle = color;
-                offCtx.globalAlpha = opacity;
-                offCtx.fillRect(x + noiseVal * 10, 0, sliceWidth, height);
-            }
-            
-            offCtx.globalAlpha = 1;
-        }
-        
-        function drawFlow() {
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0, 0, width, height);
-            
-            const time = Date.now() * 0.0001;
-            const particleCount = 150;
-            
-            for (let i = 0; i < particleCount; i++) {
-                const startX = (noise.noise2D(i * 0.1, seed) * 0.5 + 0.5) * width;
-                const startY = (noise.noise2D(i * 0.1 + 100, seed) * 0.5 + 0.5) * height;
-                
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                
-                let x = startX;
-                let y = startY;
-                
-                for (let j = 0; j < 50; j++) {
-                    const angle = noise.noise2D(x * 0.005, y * 0.005 + time) * Math.PI * 4;
-                    x += Math.cos(angle) * 8;
-                    y += Math.sin(angle) * 8;
-                    
-                    if (x < 0 || x > width || y < 0 || y > height) break;
-                    
-                    ctx.lineTo(x, y);
-                }
-                
-                const palette = ['#f4f1ea', '#c4bfb4', '#8c8673', '#666666', '#e0dcd4'];
-                ctx.strokeStyle = palette[Math.floor(Math.random() * palette.length)];
-                ctx.globalAlpha = 0.03 + Math.random() * 0.03;
-                ctx.lineWidth = 0.5 + Math.random() * 1.5;
-                ctx.stroke();
-            }
-            
-            ctx.globalAlpha = 1;
-        }
-        
-        function saveImage() {
-            const link = document.createElement('a');
-            link.download = `strata-${Date.now()}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        }
-        
-        // Event listeners
-        document.getElementById('btn-erosion').addEventListener('click', () => {
-            currentMode = 'erosion';
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-erosion').classList.add('active');
-            generate();
-            draw();
-        });
-        
-        document.getElementById('btn-slices').addEventListener('click', () => {
-            currentMode = 'slices';
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-slices').classList.add('active');
-            drawSlices();
-            draw();
-        });
-        
-        document.getElementById('btn-flow').addEventListener('click', () => {
-            currentMode = 'flow';
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-flow').classList.add('active');
-            
-            function animate() {
-                if (currentMode !== 'flow') return;
-                drawFlow();
-                animationId = requestAnimationFrame(animate);
-            }
-            animate();
-        });
-        
-        document.getElementById('btn-save').addEventListener('click', saveImage);
-        
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            mouseX = (e.clientX - rect.left) * 2;
-            mouseY = (e.clientY - rect.top) * 2;
-            
-            if (currentMode === 'erosion') {
-                draw();
-            } else if (currentMode === 'slices') {
-                drawSlices();
-            }
-        });
-        
-        // Touch support for mobile
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            mouseX = (touch.clientX - rect.left) * 2;
-            mouseY = (touch.clientY - rect.top) * 2;
-            
-            if (currentMode === 'erosion') {
-                draw();
-            } else if (currentMode === 'slices') {
-                drawSlices();
-            }
-        }, { passive: false });
-        
-        canvas.addEventListener('touchstart', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            mouseX = (touch.clientX - rect.left) * 2;
-            mouseY = (touch.clientY - rect.top) * 2;
-        });
-        
-        canvas.addEventListener('touchend', () => {
-            mouseX = 0;
-            mouseY = 0;
-        });
-        
-        canvas.addEventListener('click', () => {
-            if (currentMode === 'flow') {
-                // Stop flow animation on click and regenerate
-                cancelAnimationFrame(animationId);
-            }
-            generate();
-        });
-        
-        canvas.addEventListener('mouseleave', () => {
-            mouseX = 0;
-            mouseY = 0;
-        });
-        
-        window.addEventListener('resize', resize);
-        
-        // Initialize
-        resize();
-    </script>
+<div id="sidebar">
+  <div class="brand">
+    <h1>Strata</h1>
+    <span class="edition">gen · 002</span>
+  </div>
+  <div class="subtitle">Generative geological layers with erosion, faults, and sedimentary textures.</div>
+
+  <div class="divider"></div>
+
+  <!-- PALETTE -->
+  <div class="section-label">Palette</div>
+  <div class="palette-row" id="paletteRow"></div>
+
+  <div class="divider"></div>
+
+  <!-- LAYER CONTROLS -->
+  <div class="section-label">Geology</div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Layer Count</span>
+      <span class="val" id="layerCountVal">14</span>
+    </div>
+    <input type="range" id="layerCount" min="6" max="30" value="14" step="1">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Fold Intensity</span>
+      <span class="val" id="foldVal">0.6</span>
+    </div>
+    <input type="range" id="fold" min="0" max="2" value="0.6" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Noise Complexity</span>
+      <span class="val" id="noiseVal">4</span>
+    </div>
+    <input type="range" id="noiseOctaves" min="1" max="8" value="4" step="1">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Layer Thickness Variation</span>
+      <span class="val" id="thickVar">0.5</span>
+    </div>
+    <input type="range" id="thicknessVar" min="0" max="1" value="0.5" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Grain Texture</span>
+      <span class="val" id="grainVal">0.3</span>
+    </div>
+    <input type="range" id="grain" min="0" max="1" value="0.3" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Negative Space</span>
+      <span class="val" id="negSpaceVal">0</span>
+    </div>
+    <input type="range" id="negSpace" min="0" max="1" value="0" step="0.05">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Features</div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="faultsToggle" checked>
+    <span>Fault lines</span>
+  </label>
+
+  <div class="control-group" id="faultGroup">
+    <div class="label-row">
+      <span>Fault Count</span>
+      <span class="val" id="faultCountVal">2</span>
+    </div>
+    <input type="range" id="faultCount" min="0" max="6" value="2" step="1">
+  </div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="erosionToggle">
+    <span>Surface erosion</span>
+  </label>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Cracks</span>
+      <span class="val" id="cracksVal">0</span>
+    </div>
+    <input type="range" id="cracks" min="0" max="20" value="0" step="1">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Display</div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="frameToggle">
+    <span>Frame / mat border</span>
+  </label>
+
+  <div class="control-group" id="frameGroup" style="display:none">
+    <div class="label-row">
+      <span>Frame Width</span>
+      <span class="val" id="frameWidthVal">40</span>
+    </div>
+    <input type="range" id="frameWidth" min="15" max="80" value="40" step="5">
+    <div style="margin-top:6px">
+      <div class="label-row" style="margin-bottom:5px"><span>Frame Color</span></div>
+      <div class="mode-row">
+        <div class="mode-btn active" data-fcolor="white" onclick="setFrameColor('white')">White</div>
+        <div class="mode-btn" data-fcolor="black" onclick="setFrameColor('black')">Black</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Animation</div>
+  <label class="checkbox-group">
+    <input type="checkbox" id="animToggle">
+    <span>Animate deposition</span>
+  </label>
+
+  <div class="control-group" id="animSpeedGroup" style="display:none">
+    <div class="label-row">
+      <span>Speed</span>
+      <span class="val" id="animSpeedVal">Medium</span>
+    </div>
+    <input type="range" id="animSpeed" min="1" max="5" value="3" step="1">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Erosion Brush</div>
+  <div class="subtitle" style="margin-bottom:4px">Hover over canvas to erode. Reveals deeper layers beneath.</div>
+  <div class="control-group">
+    <div class="label-row">
+      <span>Brush Size</span>
+      <span class="val" id="brushVal">80</span>
+    </div>
+    <input type="range" id="brushSize" min="20" max="200" value="80" step="5">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="generate()">Generate</button>
+    <button class="btn btn-danger" onclick="resetErosion()">Reset Erosion</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-accent" onclick="randomizeAll()">Randomize</button>
+    <button class="btn btn-secondary" onclick="exportPNG()">Export PNG</button>
+  </div>
+
+  <div class="progress-bar" id="progressBar"><div class="fill" id="progressFill"></div></div>
+  <div class="status" id="status"></div>
+
+  <div class="hint">
+    <strong>Click</strong> Generate to create new strata<br>
+    <strong>Hover</strong> canvas to erode surface layers<br>
+    <strong>Randomize</strong> for surprise compositions
+  </div>
+</div>
+
+<div id="canvas-area">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+// ── Noise ──
+class PerlinNoise {
+  constructor(seed) {
+    this.perm = new Uint8Array(512);
+    this.seed(seed || Math.random() * 65536);
+  }
+  seed(s) {
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) {
+      s = (s * 16807 + 0) % 2147483647;
+      const j = s % (i + 1);
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255];
+  }
+  fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  lerp(t, a, b) { return a + t * (b - a); }
+  grad(hash, x, y) {
+    const h = hash & 3;
+    return ((h & 1) ? -x : x) + ((h & 2) ? -y : y);
+  }
+  noise2D(x, y) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+    x -= Math.floor(x); y -= Math.floor(y);
+    const u = this.fade(x), v = this.fade(y);
+    const A = this.perm[X] + Y, B = this.perm[X + 1] + Y;
+    return this.lerp(v,
+      this.lerp(u, this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y)),
+      this.lerp(u, this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1))
+    );
+  }
+  fbm(x, y, octaves, lacunarity = 2.0, gain = 0.5) {
+    let val = 0, amp = 0.5, freq = 1;
+    for (let i = 0; i < octaves; i++) {
+      val += amp * this.noise2D(x * freq, y * freq);
+      amp *= gain; freq *= lacunarity;
+    }
+    return val;
+  }
+  // Domain warping for more organic shapes
+  warpedFbm(x, y, octaves) {
+    const qx = this.fbm(x + 0.0, y + 0.0, octaves);
+    const qy = this.fbm(x + 5.2, y + 1.3, octaves);
+    return this.fbm(x + 4.0 * qx, y + 4.0 * qy, octaves);
+  }
+}
+
+let noise = new PerlinNoise();
+
+// ── Palettes ──
+const PALETTES = {
+  sandstone: {
+    name: 'Sandstone',
+    bg: '#1a1510',
+    layers: ['#f4ede2','#e8dcc8','#d4c4a8','#c9b08a','#b09068','#8c7050','#6b5540','#4a3828','#332818','#221a10','#c2a882','#ddd0b8','#a08060','#786048'],
+  },
+  ocean: {
+    name: 'Deep Ocean',
+    bg: '#080c14',
+    layers: ['#c8dce8','#9ab8d0','#6a94b8','#4878a0','#2c5a84','#1a4068','#0e2a4c','#081c38','#b0c8d8','#7aa0c0','#3c6890','#1e4a70','#5888a8','#a0bcd0'],
+  },
+  volcanic: {
+    name: 'Volcanic',
+    bg: '#120808',
+    layers: ['#f4a060','#e88040','#d06030','#b84020','#8c2810','#601808','#3a0c04','#1a0802','#f0c890','#d89050','#a86028','#783818','#c07838','#e0a868'],
+  },
+  arctic: {
+    name: 'Arctic Ice',
+    bg: '#0a0e12',
+    layers: ['#e8f0f4','#cce0ea','#a8c8d8','#88b0c8','#6898b8','#4880a8','#2c6490','#1a4c78','#d8e8f0','#b8d4e4','#98c0d8','#78a8c8','#5890b0','#3878a0'],
+  },
+  moss: {
+    name: 'Moss & Lichen',
+    bg: '#0a0e0a',
+    layers: ['#c8d8a8','#a8c080','#88a860','#6c8c48','#507030','#3a5420','#283c14','#1a280c','#b8cc90','#98b470','#789c50','#588438','#d0deb8','#e0e8c8'],
+  },
+  twilight: {
+    name: 'Twilight',
+    bg: '#0c0810',
+    layers: ['#d8c0e0','#c0a0d0','#a880c0','#8860a8','#6c4890','#503078','#381c5c','#241040','#e0d0e8','#c8b0d8','#b090c8','#9070b0','#704898','#503880'],
+  },
+  charcoal: {
+    name: 'Charcoal',
+    bg: '#080808',
+    layers: ['#e0dcd4','#c8c4ba','#b0aca2','#98948a','#7c7870','#646058','#4c4840','#343028','#d0ccc4','#b8b4aa','#a09c92','#888478','#6c6860','#545048'],
+  },
+  rust: {
+    name: 'Iron & Rust',
+    bg: '#100a08',
+    layers: ['#e8c8a0','#d4a878','#c08850','#a86830','#8c4c20','#703418','#542010','#381408','#ddb888','#c49860','#a47840','#845828','#f0d8b0','#c8a070'],
+  }
+};
+
+let currentPalette = 'sandstone';
+let frameColor = 'white'; // 'white' or 'black'
+let layers = [];
+let faults = [];
+let canvasW, canvasH;
+let ctx, canvas;
+let offscreen, offCtx; // main rendered image
+let erosionCanvas, erosionCtx; // erosion mask
+let mouseX = -1000, mouseY = -1000;
+let isEroding = false;
+let animating = false;
+let animLayerIndex = 0;
+
+// ── Init ──
+function init() {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+
+  offscreen = document.createElement('canvas');
+  offCtx = offscreen.getContext('2d');
+
+  erosionCanvas = document.createElement('canvas');
+  erosionCtx = erosionCanvas.getContext('2d');
+
+  resize();
+  buildPaletteUI();
+  bindEvents();
+  generate();
+}
+
+function resize() {
+  const area = document.getElementById('canvas-area');
+  // Artwork size (stays constant regardless of frame)
+  canvasW = Math.min(800, area.clientWidth - 100);
+  canvasH = Math.min(800, area.clientHeight - 100);
+  canvasW = Math.max(canvasW, 500);
+  canvasH = Math.max(canvasH, 500);
+
+  offscreen.width = canvasW;
+  offscreen.height = canvasH;
+  erosionCanvas.width = canvasW;
+  erosionCanvas.height = canvasH;
+  erosionCtx.fillStyle = '#fff';
+  erosionCtx.fillRect(0, 0, canvasW, canvasH);
+
+  updateCanvasSize();
+}
+
+function getFramePad() {
+  const p = getParams();
+  return p.frameOn ? p.frameWidth : 0;
+}
+
+function updateCanvasSize() {
+  const fw = getFramePad();
+  canvas.width = canvasW + fw * 2;
+  canvas.height = canvasH + fw * 2;
+}
+
+// ── Palette UI ──
+function buildPaletteUI() {
+  const row = document.getElementById('paletteRow');
+  row.innerHTML = '';
+  for (const [key, pal] of Object.entries(PALETTES)) {
+    const swatch = document.createElement('div');
+    swatch.className = 'palette-swatch' + (key === currentPalette ? ' active' : '');
+    swatch.dataset.palette = key;
+    swatch.title = pal.name;
+    // Show first 8 colors
+    const colors = pal.layers.slice(0, 8);
+    colors.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'swatch-color';
+      div.style.background = c;
+      swatch.appendChild(div);
+    });
+    swatch.addEventListener('click', () => {
+      currentPalette = key;
+      document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    });
+    row.appendChild(swatch);
+  }
+}
+
+// ── Events ──
+function setFrameColor(color) {
+  frameColor = color;
+  document.querySelectorAll('[data-fcolor]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-fcolor="${color}"]`).classList.add('active');
+  if (!animating) render();
+}
+
+function bindEvents() {
+  // Slider displays
+  const sliders = [
+    ['layerCount', 'layerCountVal'],
+    ['fold', 'foldVal'],
+    ['noiseOctaves', 'noiseVal'],
+    ['thicknessVar', 'thickVar'],
+    ['grain', 'grainVal'],
+    ['negSpace', 'negSpaceVal'],
+    ['faultCount', 'faultCountVal'],
+    ['cracks', 'cracksVal'],
+    ['brushSize', 'brushVal'],
+    ['frameWidth', 'frameWidthVal'],
+  ];
+  sliders.forEach(([id, vid]) => {
+    document.getElementById(id).addEventListener('input', function() {
+      document.getElementById(vid).textContent = this.value;
+    });
+  });
+
+  document.getElementById('animSpeed').addEventListener('input', function() {
+    const labels = { 1:'Very Slow', 2:'Slow', 3:'Medium', 4:'Fast', 5:'Very Fast' };
+    document.getElementById('animSpeedVal').textContent = labels[this.value] || 'Medium';
+  });
+
+  document.getElementById('animToggle').addEventListener('change', function() {
+    document.getElementById('animSpeedGroup').style.display = this.checked ? 'flex' : 'none';
+  });
+
+  document.getElementById('frameToggle').addEventListener('change', function() {
+    document.getElementById('frameGroup').style.display = this.checked ? 'flex' : 'none';
+    updateCanvasSize();
+    if (!animating) render();
+  });
+
+  document.getElementById('frameWidth').addEventListener('input', function() {
+    updateCanvasSize();
+    if (!animating) render();
+  });
+
+  // Erosion
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const fw = getFramePad();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    mouseX = (e.clientX - rect.left) * scaleX - fw;
+    mouseY = (e.clientY - rect.top) * scaleY - fw;
+    if (!animating) applyErosionBrush();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    mouseX = -1000; mouseY = -1000;
+    if (!animating) render();
+  });
+
+  window.addEventListener('resize', () => {
+    resize();
+    if (layers.length) renderAllLayers();
+  });
+}
+
+// ── Params ──
+function getParams() {
+  return {
+    layerCount: parseInt(document.getElementById('layerCount').value),
+    fold: parseFloat(document.getElementById('fold').value),
+    octaves: parseInt(document.getElementById('noiseOctaves').value),
+    thicknessVar: parseFloat(document.getElementById('thicknessVar').value),
+    grain: parseFloat(document.getElementById('grain').value),
+    negSpace: parseFloat(document.getElementById('negSpace').value),
+    faultsOn: document.getElementById('faultsToggle').checked,
+    faultCount: parseInt(document.getElementById('faultCount').value),
+    erosionOn: document.getElementById('erosionToggle').checked,
+    cracks: parseInt(document.getElementById('cracks').value),
+    frameOn: document.getElementById('frameToggle').checked,
+    frameWidth: parseInt(document.getElementById('frameWidth').value),
+    frameColor: frameColor,
+    animate: document.getElementById('animToggle').checked,
+    animSpeed: parseInt(document.getElementById('animSpeed').value),
+    brushSize: parseInt(document.getElementById('brushSize').value),
+  };
+}
+
+// ── Generate ──
+function generate() {
+  noise = new PerlinNoise(Math.random() * 65536);
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+
+  layers = [];
+  faults = [];
+
+  // Generate fault lines
+  if (p.faultsOn) {
+    for (let f = 0; f < p.faultCount; f++) {
+      faults.push({
+        x: canvasW * (0.15 + Math.random() * 0.7),
+        angle: (Math.random() - 0.5) * 0.4, // slight angle
+        offset: (Math.random() - 0.5) * canvasH * 0.12, // vertical displacement
+        width: 1 + Math.random() * 2,
+      });
+    }
+  }
+
+  // Generate layers
+  const N = p.layerCount;
+  let cumulativeY = 0;
+  const totalGapRatio = p.negSpace; // 0 = no gaps, 1 = lots of gaps
+  const layerSpan = canvasH * (1.0 + totalGapRatio * 0.8); // stretch range to create gaps
+
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    const colorIdx = Math.floor((i / N) * pal.layers.length) % pal.layers.length;
+    const cidx = Math.min(pal.layers.length - 1, colorIdx + Math.floor((Math.random() - 0.5) * 3));
+    const baseColor = pal.layers[Math.max(0, cidx)];
+
+    // Layer thickness varies
+    const baseThickness = canvasH / N;
+    const thickMult = 1.0 + (Math.random() - 0.5) * 2 * p.thicknessVar;
+
+    // Negative space: add random gaps between layers
+    const gap = totalGapRatio > 0 ? (Math.random() * baseThickness * totalGapRatio * 1.5) : 0;
+    const baseY = t * layerSpan - (layerSpan - canvasH) * 0.3 + gap * (Math.random() - 0.3);
+
+    layers.push({
+      baseY: baseY,
+      thickness: baseThickness * Math.max(0.3, thickMult) * (1.0 - totalGapRatio * 0.3),
+      color: baseColor,
+      opacity: 0.5 + Math.random() * 0.45,
+      noiseOffsetX: Math.random() * 1000,
+      noiseOffsetY: Math.random() * 1000,
+      noiseScale: 0.002 + Math.random() * 0.003,
+    });
+  }
+
+  // Reset erosion
+  erosionCtx.fillStyle = '#fff';
+  erosionCtx.fillRect(0, 0, canvasW, canvasH);
+
+  if (p.animate) {
+    startAnimation();
+  } else {
+    renderAllLayers();
+    render();
+    setStatus('Done — ' + N + ' layers deposited');
+  }
+}
+
+// ── Compute layer edge ──
+function computeLayerEdge(layer, p, yBase) {
+  const points = [];
+  const step = 2;
+  for (let x = -10; x <= canvasW + 10; x += step) {
+    let nx = x;
+    let yOff = 0;
+
+    // Apply fault displacement
+    for (const fault of faults) {
+      const fx = fault.x + Math.tan(fault.angle) * (yBase - canvasH / 2);
+      if (nx > fx) {
+        yOff += fault.offset;
+      }
+    }
+
+    // Noise displacement — domain-warped for organic look
+    const nv = noise.warpedFbm(
+      (nx + layer.noiseOffsetX) * layer.noiseScale,
+      (yBase + layer.noiseOffsetY) * layer.noiseScale * 0.5,
+      p.octaves
+    );
+
+    const displacement = nv * layer.thickness * p.fold * 3;
+    points.push({ x: nx, y: yBase + yOff + displacement });
+  }
+  return points;
+}
+
+// ── Draw a single layer to offscreen ──
+function drawLayer(targetCtx, layerIdx) {
+  const p = getParams();
+  const layer = layers[layerIdx];
+  const pal = PALETTES[currentPalette];
+  const edge = computeLayerEdge(layer, p, layer.baseY);
+
+  targetCtx.save();
+  targetCtx.globalAlpha = layer.opacity;
+
+  // Main fill
+  targetCtx.fillStyle = layer.color;
+  targetCtx.beginPath();
+  targetCtx.moveTo(-10, canvasH + 10);
+  edge.forEach(pt => targetCtx.lineTo(pt.x, pt.y));
+  targetCtx.lineTo(canvasW + 10, canvasH + 10);
+  targetCtx.closePath();
+  targetCtx.fill();
+
+  // Subtle edge highlight
+  targetCtx.strokeStyle = layer.color;
+  targetCtx.globalAlpha = Math.min(1, layer.opacity + 0.15);
+  targetCtx.lineWidth = 0.5;
+  targetCtx.beginPath();
+  edge.forEach((pt, i) => i === 0 ? targetCtx.moveTo(pt.x, pt.y) : targetCtx.lineTo(pt.x, pt.y));
+  targetCtx.stroke();
+
+  targetCtx.restore();
+
+  // Grain texture within this layer
+  if (p.grain > 0) {
+    targetCtx.save();
+    // Clip to layer shape
+    targetCtx.beginPath();
+    targetCtx.moveTo(-10, canvasH + 10);
+    edge.forEach(pt => targetCtx.lineTo(pt.x, pt.y));
+    targetCtx.lineTo(canvasW + 10, canvasH + 10);
+    targetCtx.closePath();
+    targetCtx.clip();
+
+    // Also clip to NOT cover layers below (approximate with next layer if exists)
+    const grainDensity = Math.floor(canvasW * canvasH * 0.0003 * p.grain);
+    targetCtx.fillStyle = 'rgba(0,0,0,0.15)';
+    for (let g = 0; g < grainDensity; g++) {
+      const gx = Math.random() * canvasW;
+      const gy = layer.baseY + Math.random() * layer.thickness * 2;
+      const gs = 0.5 + Math.random() * 1.5;
+      targetCtx.globalAlpha = Math.random() * 0.2 * p.grain;
+      targetCtx.fillRect(gx, gy, gs, gs);
+    }
+    // Light speckles too
+    targetCtx.fillStyle = 'rgba(255,255,255,0.1)';
+    for (let g = 0; g < grainDensity * 0.3; g++) {
+      const gx = Math.random() * canvasW;
+      const gy = layer.baseY + Math.random() * layer.thickness * 2;
+      const gs = 0.5 + Math.random() * 1;
+      targetCtx.globalAlpha = Math.random() * 0.12 * p.grain;
+      targetCtx.fillRect(gx, gy, gs, gs);
+    }
+
+    targetCtx.restore();
+  }
+}
+
+// ── Draw fault lines ──
+function drawFaults(targetCtx) {
+  const p = getParams();
+  if (!p.faultsOn) return;
+
+  for (const fault of faults) {
+    targetCtx.save();
+    targetCtx.strokeStyle = 'rgba(0,0,0,0.4)';
+    targetCtx.lineWidth = fault.width;
+    targetCtx.setLineDash([4, 6]);
+    targetCtx.beginPath();
+
+    for (let y = 0; y <= canvasH; y += 2) {
+      const fx = fault.x + Math.tan(fault.angle) * (y - canvasH / 2);
+      const jitter = noise.noise2D(y * 0.02, fault.x * 0.01) * 3;
+      if (y === 0) targetCtx.moveTo(fx + jitter, y);
+      else targetCtx.lineTo(fx + jitter, y);
+    }
+    targetCtx.stroke();
+
+    // Subtle light line next to it
+    targetCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+    targetCtx.lineWidth = 0.5;
+    targetCtx.setLineDash([]);
+    targetCtx.beginPath();
+    for (let y = 0; y <= canvasH; y += 2) {
+      const fx = fault.x + Math.tan(fault.angle) * (y - canvasH / 2) + 2;
+      const jitter = noise.noise2D(y * 0.02, fault.x * 0.01) * 3;
+      if (y === 0) targetCtx.moveTo(fx + jitter, y);
+      else targetCtx.lineTo(fx + jitter, y);
+    }
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
+}
+
+// ── Surface erosion effect ──
+function drawSurfaceErosion(targetCtx) {
+  const p = getParams();
+  if (!p.erosionOn) return;
+
+  targetCtx.save();
+  targetCtx.globalCompositeOperation = 'multiply';
+  for (let i = 0; i < 8; i++) {
+    const sx = Math.random() * canvasW;
+    targetCtx.beginPath();
+    targetCtx.moveTo(sx, 0);
+    let x = sx, y = 0;
+    while (y < canvasH * 0.4) {
+      const angle = noise.fbm(x * 0.01, y * 0.01 + i * 10, 3) * Math.PI * 0.3;
+      x += Math.cos(angle) * 3 + (Math.random() - 0.5) * 2;
+      y += 2 + Math.random() * 2;
+      targetCtx.lineTo(x, y);
+    }
+    targetCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+    targetCtx.lineWidth = 1 + Math.random() * 3;
+    targetCtx.stroke();
+  }
+  targetCtx.restore();
+}
+
+// ── Cracks ──
+function drawCracks(targetCtx) {
+  const p = getParams();
+  if (p.cracks <= 0) return;
+
+  const pal = PALETTES[currentPalette];
+
+  for (let c = 0; c < p.cracks; c++) {
+    // Start point — random position
+    let x = Math.random() * canvasW;
+    let y = Math.random() * canvasH;
+    const mainAngle = (Math.random() - 0.5) * Math.PI * 0.6 + Math.PI * 0.5; // mostly vertical-ish
+    const crackLen = 60 + Math.random() * canvasH * 0.5;
+
+    // Main crack line
+    targetCtx.save();
+    targetCtx.beginPath();
+    targetCtx.moveTo(x, y);
+
+    const segments = Math.floor(crackLen / 3);
+    const points = [{ x, y }];
+    for (let s = 0; s < segments; s++) {
+      const jitter = noise.noise2D(x * 0.03 + c * 7, y * 0.03) * 0.8;
+      const angle = mainAngle + jitter + (Math.random() - 0.5) * 0.3;
+      x += Math.cos(angle) * 3;
+      y += Math.sin(angle) * 3;
+      points.push({ x, y });
+      targetCtx.lineTo(x, y);
+    }
+
+    // Dark crack line
+    targetCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+    targetCtx.lineWidth = 0.5 + Math.random() * 1.5;
+    targetCtx.stroke();
+    targetCtx.restore();
+
+    // Light edge along one side (depth illusion)
+    targetCtx.save();
+    targetCtx.beginPath();
+    points.forEach((pt, i) => {
+      const offset = 1 + Math.random() * 0.5;
+      if (i === 0) targetCtx.moveTo(pt.x + offset, pt.y);
+      else targetCtx.lineTo(pt.x + offset, pt.y);
+    });
+    targetCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+    targetCtx.lineWidth = 0.5;
+    targetCtx.stroke();
+    targetCtx.restore();
+
+    // Small branches
+    const branchCount = 1 + Math.floor(Math.random() * 3);
+    for (let b = 0; b < branchCount; b++) {
+      const startIdx = Math.floor(Math.random() * points.length);
+      const bp = points[startIdx];
+      if (!bp) continue;
+
+      targetCtx.save();
+      targetCtx.beginPath();
+      targetCtx.moveTo(bp.x, bp.y);
+      let bx = bp.x, by = bp.y;
+      const bAngle = mainAngle + (Math.random() - 0.5) * 1.5;
+      const bLen = 10 + Math.random() * 40;
+      const bSegs = Math.floor(bLen / 3);
+      for (let s = 0; s < bSegs; s++) {
+        const jitter = (Math.random() - 0.5) * 0.5;
+        bx += Math.cos(bAngle + jitter) * 3;
+        by += Math.sin(bAngle + jitter) * 3;
+        targetCtx.lineTo(bx, by);
+      }
+      targetCtx.strokeStyle = 'rgba(0,0,0,0.3)';
+      targetCtx.lineWidth = 0.3 + Math.random() * 0.7;
+      targetCtx.stroke();
+      targetCtx.restore();
+    }
+  }
+}
+
+// ── Render all layers to offscreen ──
+function renderAllLayers() {
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+
+  // Fill entire canvas with the frame color (or palette bg when no frame).
+  // Layers paint from their wavy top edge down to the canvas bottom,
+  // so the exposed strip above the first layer will show this color.
+  offCtx.fillStyle = p.frameOn ? getFrameColorHex() : pal.bg;
+  offCtx.fillRect(0, 0, canvasW, canvasH);
+
+  for (let i = 0; i < layers.length; i++) {
+    drawLayer(offCtx, i);
+  }
+
+  drawFaults(offCtx);
+  drawCracks(offCtx);
+  drawSurfaceErosion(offCtx);
+}
+
+// ── Render final composite to visible canvas ──
+function render() {
+  const fw = getFramePad();
+  updateCanvasSize();
+
+  // Clear entire canvas (including frame area)
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw frame background first if enabled
+  if (fw > 0) {
+    drawFrame(fw);
+  }
+
+  // Composite the artwork at the inset position
+  // 1. Draw offscreen artwork
+  ctx.save();
+  ctx.translate(fw, fw);
+
+  ctx.drawImage(offscreen, 0, 0);
+
+  // Apply erosion mask
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.drawImage(erosionCanvas, 0, 0);
+
+  // Fill eroded areas with background color
+  ctx.globalCompositeOperation = 'destination-over';
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+  ctx.fillStyle = p.frameOn ? getFrameColorHex() : pal.bg;
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  ctx.restore();
+
+  // Re-draw the frame on top to get clean edges
+  if (fw > 0) {
+    drawFrameOverlay(fw);
+  }
+}
+
+function getFrameColorHex() {
+  return frameColor === 'black' ? '#0a0a09' : '#f4f1ea';
+}
+
+function drawFrame(fw) {
+  ctx.fillStyle = getFrameColorHex();
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawFrameOverlay(fw) {
+  ctx.save();
+  const fc = getFrameColorHex();
+  const isBlack = frameColor === 'black';
+
+  // Clean mat border over the edges
+  ctx.fillStyle = fc;
+  ctx.fillRect(0, 0, canvas.width, fw);
+  ctx.fillRect(0, canvas.height - fw, canvas.width, fw);
+  ctx.fillRect(0, 0, fw, canvas.height);
+  ctx.fillRect(canvas.width - fw, 0, fw, canvas.height);
+
+  // Inner shadow line
+  ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(fw - 0.5, fw - 0.5, canvasW + 1, canvasH + 1);
+
+  // Second subtle inner shadow
+  ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(fw - 2, fw - 2, canvasW + 4, canvasH + 4);
+
+  // Outer border of frame
+  ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+  ctx.restore();
+}
+
+// ── Erosion brush ──
+function applyErosionBrush() {
+  if (mouseX < 0 || mouseY < 0) return;
+  const p = getParams();
+  const r = p.brushSize;
+
+  // Erode into the erosion mask (make areas darker = more eroded)
+  erosionCtx.save();
+  const grad = erosionCtx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, r);
+  grad.addColorStop(0, 'rgba(0,0,0,0.02)');
+  grad.addColorStop(0.5, 'rgba(0,0,0,0.01)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  erosionCtx.fillStyle = grad;
+  erosionCtx.beginPath();
+  erosionCtx.arc(mouseX, mouseY, r, 0, Math.PI * 2);
+  erosionCtx.fill();
+  erosionCtx.restore();
+
+  render();
+}
+
+function resetErosion() {
+  erosionCtx.fillStyle = '#fff';
+  erosionCtx.fillRect(0, 0, canvasW, canvasH);
+  render();
+  setStatus('Erosion reset');
+}
+
+// ── Animation ──
+function startAnimation() {
+  animating = true;
+  animLayerIndex = 0;
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+  offCtx.fillStyle = p.frameOn ? getFrameColorHex() : pal.bg;
+  offCtx.fillRect(0, 0, canvasW, canvasH);
+  render();
+  setStatus('Depositing layers...');
+  document.getElementById('progressBar').style.display = 'block';
+  animateStep();
+}
+
+function animateStep() {
+  if (animLayerIndex >= layers.length) {
+    finishAnimation();
+    return;
+  }
+
+  const p = getParams();
+  const speed = [1, 1, 2, 4, 8][p.animSpeed - 1] || 2;
+  const end = Math.min(animLayerIndex + speed, layers.length);
+
+  for (let i = animLayerIndex; i < end; i++) {
+    drawLayer(offCtx, i);
+  }
+  animLayerIndex = end;
+
+  // Draw faults progressively
+  if (animLayerIndex >= layers.length) {
+    drawFaults(offCtx);
+    drawSurfaceErosion(offCtx);
+  }
+
+  render();
+
+  const pct = (animLayerIndex / layers.length * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  setStatus('Layer ' + animLayerIndex + ' / ' + layers.length);
+
+  const delay = [120, 80, 40, 20, 5][p.animSpeed - 1] || 40;
+  setTimeout(() => requestAnimationFrame(animateStep), delay);
+}
+
+function finishAnimation() {
+  animating = false;
+  document.getElementById('progressBar').style.display = 'none';
+  setStatus('Done — ' + layers.length + ' layers deposited');
+}
+
+// ── Randomize ──
+function randomizeAll() {
+  // Random palette
+  const keys = Object.keys(PALETTES);
+  currentPalette = keys[Math.floor(Math.random() * keys.length)];
+  document.querySelectorAll('.palette-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.palette === currentPalette);
+  });
+
+  // Random params
+  document.getElementById('layerCount').value = 8 + Math.floor(Math.random() * 18);
+  document.getElementById('fold').value = (Math.random() * 1.8).toFixed(2);
+  document.getElementById('noiseOctaves').value = 2 + Math.floor(Math.random() * 5);
+  document.getElementById('thicknessVar').value = (Math.random() * 0.8).toFixed(2);
+  document.getElementById('grain').value = (Math.random() * 0.6).toFixed(2);
+  document.getElementById('negSpace').value = (Math.random() * 0.7).toFixed(2);
+  document.getElementById('faultCount').value = Math.floor(Math.random() * 4);
+  document.getElementById('cracks').value = Math.floor(Math.random() * 10);
+
+  // Update displays
+  ['layerCount','fold','noiseOctaves','thicknessVar','grain','negSpace','faultCount','cracks'].forEach(id => {
+    const el = document.getElementById(id);
+    el.dispatchEvent(new Event('input'));
+  });
+
+  generate();
+}
+
+// ── Export ──
+function exportPNG() {
+  render();
+  const link = document.createElement('a');
+  link.download = 'strata-' + Date.now() + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  setStatus('PNG exported');
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+// ── Start ──
+window.addEventListener('load', init);
+</script>
 </body>
 </html>

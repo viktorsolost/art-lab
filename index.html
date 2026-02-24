@@ -25,21 +25,70 @@
     }
     .tools {
       display: flex;
-      gap: 3rem;
+      gap: 2rem;
       flex-wrap: wrap;
       justify-content: center;
+      align-items: center;
     }
-    a {
+    a, .dropdown {
       color: #888;
       text-decoration: none;
       font-size: 1.2rem;
       padding: 1rem 2rem;
       border: 1px solid #333;
       transition: all 0.3s ease;
+      background: transparent;
     }
     a:hover {
       color: #fff;
       border-color: #666;
+    }
+    
+    /* Dropdown */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .dropdown:hover {
+      color: #fff;
+      border-color: #666;
+    }
+    .dropdown-content {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111;
+      border: 1px solid #333;
+      min-width: 180px;
+      z-index: 1;
+      margin-top: 8px;
+    }
+    .dropdown:hover .dropdown-content {
+      display: block;
+    }
+    .dropdown-content a {
+      display: block;
+      padding: 0.8rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-bottom: 1px solid #222;
+    }
+    .dropdown-content a:last-child {
+      border-bottom: none;
+    }
+    .dropdown-content a:hover {
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .dropdown-label {
+      display: block;
+    }
+    .dropdown-arrow {
+      font-size: 0.8em;
+      margin-left: 4px;
     }
   </style>
 </head>
@@ -47,7 +96,14 @@
   <h1>ART LAB</h1>
   <div class="tools">
     <a href="contour-lines.html">Contour Lines</a>
-    <a href="strata.html">Strata</a>
+    
+    <div class="dropdown">
+      <span class="dropdown-label">Strata <span class="dropdown-arrow">▼</span></span>
+      <div class="dropdown-content">
+        <a href="strata.html">Latest (gen 002)</a>
+      </div>
+    </div>
+    
     <a href="asemic_drift.html">Asemic Drift</a>
     <a href="echo_chambers.html">Echo Chambers</a>
     <a href="eterno_currents.html">Eterno Currents</a>
