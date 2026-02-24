@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slices — Generative Vertical Compositions</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a09;
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    color: #999;
+  }
+
+  #sidebar {
+    width: 300px; min-width: 300px;
+    background: #0d0d0c; padding: 24px 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    overflow-y: auto; border-right: 1px solid #1a1a18;
+  }
+  #sidebar::-webkit-scrollbar { width: 3px; }
+  #sidebar::-webkit-scrollbar-track { background: transparent; }
+  #sidebar::-webkit-scrollbar-thumb { background: #2a2a26; border-radius: 2px; }
+
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+  .brand h1 {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px; font-weight: 400; color: #e8e4dc; letter-spacing: 1px;
+  }
+  .brand .edition { font-size: 9px; color: #4a4a42; letter-spacing: 2px; text-transform: uppercase; }
+  .subtitle { font-size: 10px; color: #3a3a34; line-height: 1.5; letter-spacing: 0.5px; }
+
+  .section-label {
+    font-size: 9px; font-weight: 500; color: #4a4a42;
+    text-transform: uppercase; letter-spacing: 2px; margin-top: 6px;
+  }
+
+  .control-group { display: flex; flex-direction: column; gap: 5px; }
+  .label-row {
+    font-size: 10px; font-weight: 400; color: #6a6a60; letter-spacing: 0.5px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .label-row .val { color: #4a4a42; font-size: 10px; }
+
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 2px;
+    background: #222220; border-radius: 1px; outline: none; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px;
+    background: #c9b8a8; border-radius: 50%; cursor: pointer; border: 2px solid #0d0d0c;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; background: #c9b8a8; border-radius: 50%;
+    cursor: pointer; border: 2px solid #0d0d0c;
+  }
+
+  .divider { height: 1px; background: #1a1a18; margin: 4px 0; }
+
+  .palette-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .palette-swatch {
+    width: 100%; height: 24px; border-radius: 4px; cursor: pointer;
+    display: flex; overflow: hidden; border: 2px solid transparent;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .palette-swatch:hover { transform: scale(1.02); }
+  .palette-swatch.active { border-color: #c9b8a8; }
+  .palette-swatch .swatch-color { flex: 1; }
+
+  .mode-row { display: flex; gap: 5px; }
+  .mode-btn {
+    flex: 1; padding: 8px 0; background: #141412; border: 1px solid #222220;
+    border-radius: 5px; color: #5a5a52; font-family: 'DM Mono', monospace;
+    font-size: 9px; font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .mode-btn:hover { border-color: #3a3a34; color: #8a8a80; }
+  .mode-btn.active { background: #c9b8a8; color: #0d0d0c; border-color: #c9b8a8; }
+
+  .checkbox-group {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 10px; color: #6a6a60; letter-spacing: 0.5px;
+  }
+  .checkbox-group input[type="checkbox"] { accent-color: #c9b8a8; cursor: pointer; width: 13px; height: 13px; }
+
+  .btn-row { display: flex; gap: 6px; }
+  .btn {
+    flex: 1; padding: 10px 10px; border: none; border-radius: 5px;
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: #c9b8a8; color: #0d0d0c; }
+  .btn-primary:hover { background: #d4c4b0; }
+  .btn-secondary { background: #1a1a18; color: #6a6a60; }
+  .btn-secondary:hover { background: #222220; }
+  .btn-accent { background: #1a1e1a; color: #7a9a6a; }
+  .btn-accent:hover { background: #202820; }
+
+  .status { font-size: 9px; color: #3a3a34; min-height: 14px; letter-spacing: 0.5px; }
+
+  .hint {
+    font-size: 9px; color: #2a2a26; line-height: 1.6;
+    margin-top: auto; padding-top: 10px; border-top: 1px solid #1a1a18; letter-spacing: 0.3px;
+  }
+  .hint strong { color: #4a4a42; font-weight: 500; }
+
+  #canvas-area {
+    flex: 1; display: flex; justify-content: center; align-items: center;
+    padding: 30px; position: relative;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(40,35,28,0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 50%, rgba(28,30,35,0.2) 0%, transparent 60%),
+      #0a0a09;
+  }
+  #canvas-area canvas {
+    box-shadow: 0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.03);
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="brand">
+    <h1>Slices</h1>
+    <span class="edition">gen · 002</span>
+  </div>
+  <div class="subtitle">Vertical geological cross-sections with noise-driven edges, depth, and texture.</div>
+
+  <div class="divider"></div>
+
+  <!-- PALETTE -->
+  <div class="section-label">Palette</div>
+  <div class="palette-row" id="paletteRow"></div>
+
+  <div class="divider"></div>
+
+  <!-- STRUCTURE -->
+  <div class="section-label">Structure</div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Slice Count</span>
+      <span class="val" id="sliceCountVal">18</span>
+    </div>
+    <input type="range" id="sliceCount" min="4" max="60" value="18" step="1">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Edge Distortion</span>
+      <span class="val" id="distortVal">0.5</span>
+    </div>
+    <input type="range" id="distort" min="0" max="2" value="0.5" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Noise Complexity</span>
+      <span class="val" id="noiseVal">4</span>
+    </div>
+    <input type="range" id="noiseOctaves" min="1" max="8" value="4" step="1">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Width Variation</span>
+      <span class="val" id="widthVarVal">0.5</span>
+    </div>
+    <input type="range" id="widthVar" min="0" max="1" value="0.5" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Negative Space</span>
+      <span class="val" id="negSpaceVal">0</span>
+    </div>
+    <input type="range" id="negSpace" min="0" max="1" value="0" step="0.05">
+  </div>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Grain Texture</span>
+      <span class="val" id="grainVal">0.25</span>
+    </div>
+    <input type="range" id="grain" min="0" max="1" value="0.25" step="0.05">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Style</div>
+
+  <div class="control-group">
+    <div class="label-row" style="margin-bottom:4px"><span>Edge Shape</span></div>
+    <div class="mode-row">
+      <div class="mode-btn active" data-edge="organic" onclick="setEdge('organic')">Organic</div>
+      <div class="mode-btn" data-edge="straight" onclick="setEdge('straight')">Straight</div>
+      <div class="mode-btn" data-edge="jagged" onclick="setEdge('jagged')">Jagged</div>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <div class="label-row" style="margin-bottom:4px"><span>Orientation</span></div>
+    <div class="mode-row">
+      <div class="mode-btn active" data-orient="vertical" onclick="setOrientation('vertical')">Vertical</div>
+      <div class="mode-btn" data-orient="horizontal" onclick="setOrientation('horizontal')">Horizontal</div>
+      <div class="mode-btn" data-orient="diagonal" onclick="setOrientation('diagonal')">Diagonal</div>
+    </div>
+  </div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="shadowToggle" checked>
+    <span>Edge shadows</span>
+  </label>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="highlightToggle" checked>
+    <span>Edge highlights</span>
+  </label>
+
+  <div class="control-group">
+    <div class="label-row">
+      <span>Cracks</span>
+      <span class="val" id="cracksVal">0</span>
+    </div>
+    <input type="range" id="cracks" min="0" max="15" value="0" step="1">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section-label">Display</div>
+
+  <label class="checkbox-group">
+    <input type="checkbox" id="frameToggle">
+    <span>Frame / mat border</span>
+  </label>
+
+  <div id="frameGroup" style="display:none">
+    <div class="control-group" style="margin-top:6px">
+      <div class="label-row">
+        <span>Frame Width</span>
+        <span class="val" id="frameWidthVal">40</span>
+      </div>
+      <input type="range" id="frameWidth" min="15" max="80" value="40" step="5">
+    </div>
+    <div style="margin-top:6px">
+      <div class="label-row" style="margin-bottom:5px"><span>Frame Color</span></div>
+      <div class="mode-row">
+        <div class="mode-btn active" data-fcolor="white" onclick="setFrameColor('white')">White</div>
+        <div class="mode-btn" data-fcolor="black" onclick="setFrameColor('black')">Black</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="generate()">Generate</button>
+    <button class="btn btn-accent" onclick="randomizeAll()">Randomize</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="exportPNG()">Export PNG</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="hint">
+    <strong>Click</strong> Generate for new composition<br>
+    <strong>Randomize</strong> for surprise results<br>
+    <strong>Orientation</strong> rotates the slice direction
+  </div>
+</div>
+
+<div id="canvas-area">
+  <canvas id="canvas"></canvas>
+</div>
+
+<script>
+// ── Noise ──
+class PerlinNoise {
+  constructor(seed) {
+    this.perm = new Uint8Array(512);
+    this.seed(seed || Math.random() * 65536);
+  }
+  seed(s) {
+    const p = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) p[i] = i;
+    for (let i = 255; i > 0; i--) {
+      s = (s * 16807 + 0) % 2147483647;
+      const j = s % (i + 1);
+      [p[i], p[j]] = [p[j], p[i]];
+    }
+    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255];
+  }
+  fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  lerp(t, a, b) { return a + t * (b - a); }
+  grad(hash, x, y) {
+    const h = hash & 3;
+    return ((h & 1) ? -x : x) + ((h & 2) ? -y : y);
+  }
+  noise2D(x, y) {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255;
+    x -= Math.floor(x); y -= Math.floor(y);
+    const u = this.fade(x), v = this.fade(y);
+    const A = this.perm[X] + Y, B = this.perm[X + 1] + Y;
+    return this.lerp(v,
+      this.lerp(u, this.grad(this.perm[A], x, y), this.grad(this.perm[B], x - 1, y)),
+      this.lerp(u, this.grad(this.perm[A + 1], x, y - 1), this.grad(this.perm[B + 1], x - 1, y - 1))
+    );
+  }
+  fbm(x, y, octaves, lacunarity = 2.0, gain = 0.5) {
+    let val = 0, amp = 0.5, freq = 1;
+    for (let i = 0; i < octaves; i++) {
+      val += amp * this.noise2D(x * freq, y * freq);
+      amp *= gain; freq *= lacunarity;
+    }
+    return val;
+  }
+  warpedFbm(x, y, octaves) {
+    const qx = this.fbm(x, y, octaves);
+    const qy = this.fbm(x + 5.2, y + 1.3, octaves);
+    return this.fbm(x + 4.0 * qx, y + 4.0 * qy, octaves);
+  }
+}
+
+let noise = new PerlinNoise();
+
+// ── Palettes ──
+const PALETTES = {
+  sandstone: {
+    name: 'Sandstone',
+    bg: '#1a1510',
+    layers: ['#f4ede2','#e8dcc8','#d4c4a8','#c9b08a','#b09068','#8c7050','#6b5540','#4a3828','#332818','#c2a882','#ddd0b8','#a08060'],
+  },
+  ocean: {
+    name: 'Deep Ocean',
+    bg: '#080c14',
+    layers: ['#c8dce8','#9ab8d0','#6a94b8','#4878a0','#2c5a84','#1a4068','#0e2a4c','#b0c8d8','#7aa0c0','#3c6890','#5888a8','#a0bcd0'],
+  },
+  volcanic: {
+    name: 'Volcanic',
+    bg: '#120808',
+    layers: ['#f4a060','#e88040','#d06030','#b84020','#8c2810','#601808','#3a0c04','#f0c890','#d89050','#a86028','#c07838','#e0a868'],
+  },
+  arctic: {
+    name: 'Arctic Ice',
+    bg: '#0a0e12',
+    layers: ['#e8f0f4','#cce0ea','#a8c8d8','#88b0c8','#6898b8','#4880a8','#2c6490','#d8e8f0','#b8d4e4','#98c0d8','#78a8c8','#5890b0'],
+  },
+  moss: {
+    name: 'Moss & Lichen',
+    bg: '#0a0e0a',
+    layers: ['#c8d8a8','#a8c080','#88a860','#6c8c48','#507030','#3a5420','#283c14','#b8cc90','#98b470','#789c50','#d0deb8','#e0e8c8'],
+  },
+  twilight: {
+    name: 'Twilight',
+    bg: '#0c0810',
+    layers: ['#d8c0e0','#c0a0d0','#a880c0','#8860a8','#6c4890','#503078','#381c5c','#e0d0e8','#c8b0d8','#b090c8','#704898','#503880'],
+  },
+  charcoal: {
+    name: 'Charcoal',
+    bg: '#080808',
+    layers: ['#e0dcd4','#c8c4ba','#b0aca2','#98948a','#7c7870','#646058','#4c4840','#d0ccc4','#b8b4aa','#a09c92','#888478','#6c6860'],
+  },
+  rust: {
+    name: 'Iron & Rust',
+    bg: '#100a08',
+    layers: ['#e8c8a0','#d4a878','#c08850','#a86830','#8c4c20','#703418','#542010','#ddb888','#c49860','#a47840','#f0d8b0','#c8a070'],
+  }
+};
+
+let currentPalette = 'sandstone';
+let frameColor = 'white';
+let edgeShape = 'organic';
+let orientation = 'vertical';
+let slices = [];
+let artW, artH;
+let ctx, canvas;
+let offscreen, offCtx;
+
+// ── Init ──
+function init() {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+  offscreen = document.createElement('canvas');
+  offCtx = offscreen.getContext('2d');
+
+  resize();
+  buildPaletteUI();
+  bindEvents();
+  generate();
+}
+
+function resize() {
+  const area = document.getElementById('canvas-area');
+  artW = Math.min(800, area.clientWidth - 100);
+  artH = Math.min(800, area.clientHeight - 100);
+  artW = Math.max(artW, 500);
+  artH = Math.max(artH, 500);
+  offscreen.width = artW;
+  offscreen.height = artH;
+  updateCanvasSize();
+}
+
+function getFramePad() {
+  const p = getParams();
+  return p.frameOn ? p.frameWidth : 0;
+}
+
+function updateCanvasSize() {
+  const fw = getFramePad();
+  canvas.width = artW + fw * 2;
+  canvas.height = artH + fw * 2;
+}
+
+function getFrameColorHex() {
+  return frameColor === 'black' ? '#0a0a09' : '#f4f1ea';
+}
+
+// ── Palette UI ──
+function buildPaletteUI() {
+  const row = document.getElementById('paletteRow');
+  row.innerHTML = '';
+  for (const [key, pal] of Object.entries(PALETTES)) {
+    const swatch = document.createElement('div');
+    swatch.className = 'palette-swatch' + (key === currentPalette ? ' active' : '');
+    swatch.dataset.palette = key;
+    swatch.title = pal.name;
+    pal.layers.slice(0, 8).forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'swatch-color';
+      div.style.background = c;
+      swatch.appendChild(div);
+    });
+    swatch.addEventListener('click', () => {
+      currentPalette = key;
+      document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+    });
+    row.appendChild(swatch);
+  }
+}
+
+// ── Mode setters ──
+function setEdge(shape) {
+  edgeShape = shape;
+  document.querySelectorAll('[data-edge]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-edge="${shape}"]`).classList.add('active');
+}
+
+function setOrientation(o) {
+  orientation = o;
+  document.querySelectorAll('[data-orient]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-orient="${o}"]`).classList.add('active');
+}
+
+function setFrameColor(color) {
+  frameColor = color;
+  document.querySelectorAll('[data-fcolor]').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-fcolor="${color}"]`).classList.add('active');
+  render();
+}
+
+// ── Events ──
+function bindEvents() {
+  const sliders = [
+    ['sliceCount','sliceCountVal'], ['distort','distortVal'], ['noiseOctaves','noiseVal'],
+    ['widthVar','widthVarVal'], ['negSpace','negSpaceVal'], ['grain','grainVal'],
+    ['cracks','cracksVal'], ['frameWidth','frameWidthVal'],
+  ];
+  sliders.forEach(([id, vid]) => {
+    document.getElementById(id).addEventListener('input', function() {
+      document.getElementById(vid).textContent = this.value;
+    });
+  });
+
+  document.getElementById('frameToggle').addEventListener('change', function() {
+    document.getElementById('frameGroup').style.display = this.checked ? 'block' : 'none';
+    updateCanvasSize();
+    render();
+  });
+  document.getElementById('frameWidth').addEventListener('input', () => { updateCanvasSize(); render(); });
+
+  window.addEventListener('resize', () => { resize(); if (slices.length) { renderAll(); render(); } });
+}
+
+// ── Params ──
+function getParams() {
+  return {
+    sliceCount: parseInt(document.getElementById('sliceCount').value),
+    distort: parseFloat(document.getElementById('distort').value),
+    octaves: parseInt(document.getElementById('noiseOctaves').value),
+    widthVar: parseFloat(document.getElementById('widthVar').value),
+    negSpace: parseFloat(document.getElementById('negSpace').value),
+    grain: parseFloat(document.getElementById('grain').value),
+    shadows: document.getElementById('shadowToggle').checked,
+    highlights: document.getElementById('highlightToggle').checked,
+    cracks: parseInt(document.getElementById('cracks').value),
+    frameOn: document.getElementById('frameToggle').checked,
+    frameWidth: parseInt(document.getElementById('frameWidth').value),
+    frameColor: frameColor,
+  };
+}
+
+// ── Generate slices ──
+function generate() {
+  noise = new PerlinNoise(Math.random() * 65536);
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+
+  slices = [];
+  const N = p.sliceCount;
+
+  // In "vertical" mode, slices go left to right
+  // In "horizontal" mode, slices go top to bottom
+  // In "diagonal" mode, slices go at an angle
+  const totalSpan = (orientation === 'horizontal') ? artH : artW;
+  const gapFactor = p.negSpace;
+
+  let cursor = 0;
+  for (let i = 0; i < N; i++) {
+    const t = i / N;
+    const baseWidth = totalSpan / N;
+    const widthMult = 1 + (noise.noise2D(i * 0.3, 0) * 2) * p.widthVar;
+    const w = Math.max(3, baseWidth * widthMult * (1 - gapFactor * 0.3));
+    const gap = gapFactor > 0 ? Math.random() * baseWidth * gapFactor * 1.2 : 0;
+
+    const cidx = Math.floor(t * pal.layers.length + (Math.random() - 0.5) * 3);
+    const color = pal.layers[Math.max(0, Math.min(pal.layers.length - 1, cidx))];
+
+    slices.push({
+      pos: cursor + gap,
+      width: w,
+      color: color,
+      opacity: 0.55 + Math.random() * 0.4,
+      noiseOff: Math.random() * 1000,
+      noiseScale: 0.003 + Math.random() * 0.005,
+    });
+
+    cursor += w + gap;
+  }
+
+  // Normalize to fit
+  const maxPos = slices[slices.length - 1].pos + slices[slices.length - 1].width;
+  const scale = totalSpan / maxPos;
+  slices.forEach(s => { s.pos *= scale; s.width *= scale; });
+
+  renderAll();
+  render();
+  setStatus('Done — ' + N + ' slices generated');
+}
+
+// ── Compute edge path ──
+function computeEdge(slice, p, pos, along) {
+  // along = the length of the slice (height for vertical, width for horizontal)
+  const points = [];
+  const step = 2;
+  for (let t = -10; t <= along + 10; t += step) {
+    let offset = 0;
+    const ns = slice.noiseScale;
+    const noff = slice.noiseOff;
+
+    if (edgeShape === 'organic') {
+      offset = noise.warpedFbm((t + noff) * ns, pos * ns * 0.3, p.octaves) * slice.width * p.distort * 2;
+    } else if (edgeShape === 'straight') {
+      offset = noise.fbm((t + noff) * ns * 0.3, pos * ns * 0.1, 2) * slice.width * p.distort * 0.3;
+    } else if (edgeShape === 'jagged') {
+      const base = noise.fbm((t + noff) * ns * 2, pos * ns, p.octaves) * slice.width * p.distort * 1.5;
+      const sharp = Math.abs(noise.noise2D((t + noff) * ns * 5, pos * ns * 2)) * slice.width * p.distort * 0.8;
+      offset = base + sharp;
+    }
+
+    points.push({ t, offset });
+  }
+  return points;
+}
+
+// ── Draw single slice ──
+function drawSlice(targetCtx, idx) {
+  const p = getParams();
+  const slice = slices[idx];
+  const pal = PALETTES[currentPalette];
+
+  const isVert = orientation === 'vertical';
+  const isHoriz = orientation === 'horizontal';
+  const isDiag = orientation === 'diagonal';
+  const along = isHoriz ? artW : artH;
+
+  const leftEdge = computeEdge(slice, p, slice.pos, along);
+  const rightEdge = computeEdge(slice, p, slice.pos + slice.width, along);
+
+  targetCtx.save();
+
+  if (isDiag) {
+    targetCtx.translate(artW / 2, artH / 2);
+    targetCtx.rotate(-Math.PI / 6);
+    targetCtx.translate(-artW / 2, -artH / 2);
+  }
+
+  // Build polygon
+  targetCtx.beginPath();
+  if (isVert || isDiag) {
+    // Left edge going down
+    leftEdge.forEach((pt, i) => {
+      const x = slice.pos + pt.offset;
+      const y = pt.t;
+      if (i === 0) targetCtx.moveTo(x, y);
+      else targetCtx.lineTo(x, y);
+    });
+    // Right edge going up
+    for (let i = rightEdge.length - 1; i >= 0; i--) {
+      const x = slice.pos + slice.width + rightEdge[i].offset;
+      const y = rightEdge[i].t;
+      targetCtx.lineTo(x, y);
+    }
+  } else {
+    // Horizontal: top edge going right
+    leftEdge.forEach((pt, i) => {
+      const x = pt.t;
+      const y = slice.pos + pt.offset;
+      if (i === 0) targetCtx.moveTo(x, y);
+      else targetCtx.lineTo(x, y);
+    });
+    // Bottom edge going left
+    for (let i = rightEdge.length - 1; i >= 0; i--) {
+      const x = rightEdge[i].t;
+      const y = slice.pos + slice.width + rightEdge[i].offset;
+      targetCtx.lineTo(x, y);
+    }
+  }
+  targetCtx.closePath();
+
+  // Fill
+  targetCtx.globalAlpha = slice.opacity;
+  targetCtx.fillStyle = slice.color;
+  targetCtx.fill();
+
+  // Edge shadow (left/top side)
+  if (p.shadows) {
+    targetCtx.save();
+    targetCtx.clip();
+    targetCtx.beginPath();
+    if (isVert || isDiag) {
+      leftEdge.forEach((pt, i) => {
+        const x = slice.pos + pt.offset;
+        const y = pt.t;
+        if (i === 0) targetCtx.moveTo(x, y);
+        else targetCtx.lineTo(x, y);
+      });
+      leftEdge.forEach((pt, i) => {
+        const x = slice.pos + pt.offset + 8;
+        const y = pt.t;
+        if (i === 0) {} else targetCtx.lineTo(x, pt.t);
+      });
+    } else {
+      leftEdge.forEach((pt, i) => {
+        const x = pt.t;
+        const y = slice.pos + pt.offset;
+        if (i === 0) targetCtx.moveTo(x, y);
+        else targetCtx.lineTo(x, y);
+      });
+      leftEdge.slice().reverse().forEach((pt) => {
+        targetCtx.lineTo(pt.t, slice.pos + pt.offset + 8);
+      });
+    }
+    targetCtx.closePath();
+    targetCtx.fillStyle = 'rgba(0,0,0,0.15)';
+    targetCtx.globalAlpha = 1;
+    targetCtx.fill();
+    targetCtx.restore();
+  }
+
+  // Edge highlight (right/bottom side)
+  if (p.highlights) {
+    targetCtx.globalAlpha = 0.4;
+    targetCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+    targetCtx.lineWidth = 0.8;
+    targetCtx.beginPath();
+    if (isVert || isDiag) {
+      rightEdge.forEach((pt, i) => {
+        const x = slice.pos + slice.width + pt.offset;
+        if (i === 0) targetCtx.moveTo(x, pt.t);
+        else targetCtx.lineTo(x, pt.t);
+      });
+    } else {
+      rightEdge.forEach((pt, i) => {
+        const y = slice.pos + slice.width + pt.offset;
+        if (i === 0) targetCtx.moveTo(pt.t, y);
+        else targetCtx.lineTo(pt.t, y);
+      });
+    }
+    targetCtx.stroke();
+  }
+
+  // Grain
+  if (p.grain > 0) {
+    targetCtx.save();
+    // Re-clip to slice shape
+    targetCtx.beginPath();
+    if (isVert || isDiag) {
+      leftEdge.forEach((pt, i) => {
+        const x = slice.pos + pt.offset;
+        if (i === 0) targetCtx.moveTo(x, pt.t);
+        else targetCtx.lineTo(x, pt.t);
+      });
+      for (let i = rightEdge.length - 1; i >= 0; i--) {
+        targetCtx.lineTo(slice.pos + slice.width + rightEdge[i].offset, rightEdge[i].t);
+      }
+    } else {
+      leftEdge.forEach((pt, i) => {
+        if (i === 0) targetCtx.moveTo(pt.t, slice.pos + pt.offset);
+        else targetCtx.lineTo(pt.t, slice.pos + pt.offset);
+      });
+      for (let i = rightEdge.length - 1; i >= 0; i--) {
+        targetCtx.lineTo(rightEdge[i].t, slice.pos + slice.width + rightEdge[i].offset);
+      }
+    }
+    targetCtx.closePath();
+    targetCtx.clip();
+
+    const density = Math.floor(artW * artH * 0.00015 * p.grain);
+    // Dark speckles
+    targetCtx.fillStyle = 'rgba(0,0,0,0.2)';
+    for (let g = 0; g < density; g++) {
+      const gx = Math.random() * artW;
+      const gy = Math.random() * artH;
+      targetCtx.globalAlpha = Math.random() * 0.25 * p.grain;
+      targetCtx.fillRect(gx, gy, 0.5 + Math.random() * 1.5, 0.5 + Math.random() * 1.5);
+    }
+    // Light speckles
+    targetCtx.fillStyle = 'rgba(255,255,255,0.15)';
+    for (let g = 0; g < density * 0.3; g++) {
+      const gx = Math.random() * artW;
+      const gy = Math.random() * artH;
+      targetCtx.globalAlpha = Math.random() * 0.15 * p.grain;
+      targetCtx.fillRect(gx, gy, 0.5 + Math.random(), 0.5 + Math.random());
+    }
+    targetCtx.restore();
+  }
+
+  targetCtx.restore();
+}
+
+// ── Cracks ──
+function drawCracks(targetCtx) {
+  const p = getParams();
+  if (p.cracks <= 0) return;
+
+  for (let c = 0; c < p.cracks; c++) {
+    let x = Math.random() * artW;
+    let y = Math.random() * artH;
+    const isVert = orientation === 'vertical';
+    const mainAngle = isVert
+      ? (Math.random() - 0.5) * 0.6 + Math.PI * 0.5
+      : (Math.random() - 0.5) * 0.6;
+    const crackLen = 40 + Math.random() * Math.max(artW, artH) * 0.4;
+
+    targetCtx.save();
+    targetCtx.beginPath();
+    targetCtx.moveTo(x, y);
+    const pts = [{ x, y }];
+    const segs = Math.floor(crackLen / 3);
+    for (let s = 0; s < segs; s++) {
+      const jitter = noise.noise2D(x * 0.03 + c * 7, y * 0.03) * 0.7;
+      const a = mainAngle + jitter + (Math.random() - 0.5) * 0.25;
+      x += Math.cos(a) * 3;
+      y += Math.sin(a) * 3;
+      pts.push({ x, y });
+      targetCtx.lineTo(x, y);
+    }
+    targetCtx.strokeStyle = 'rgba(0,0,0,0.45)';
+    targetCtx.lineWidth = 0.4 + Math.random() * 1.2;
+    targetCtx.stroke();
+    targetCtx.restore();
+
+    // Light edge
+    targetCtx.save();
+    targetCtx.beginPath();
+    pts.forEach((pt, i) => {
+      if (i === 0) targetCtx.moveTo(pt.x + 1, pt.y);
+      else targetCtx.lineTo(pt.x + 1, pt.y);
+    });
+    targetCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+    targetCtx.lineWidth = 0.5;
+    targetCtx.stroke();
+    targetCtx.restore();
+
+    // Branches
+    const bc = 1 + Math.floor(Math.random() * 2);
+    for (let b = 0; b < bc; b++) {
+      const bp = pts[Math.floor(Math.random() * pts.length)];
+      if (!bp) continue;
+      targetCtx.save();
+      targetCtx.beginPath();
+      targetCtx.moveTo(bp.x, bp.y);
+      let bx = bp.x, by = bp.y;
+      const ba = mainAngle + (Math.random() - 0.5) * 1.5;
+      for (let s = 0; s < 5 + Math.random() * 12; s++) {
+        bx += Math.cos(ba + (Math.random() - 0.5) * 0.4) * 3;
+        by += Math.sin(ba + (Math.random() - 0.5) * 0.4) * 3;
+        targetCtx.lineTo(bx, by);
+      }
+      targetCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+      targetCtx.lineWidth = 0.3 + Math.random() * 0.5;
+      targetCtx.stroke();
+      targetCtx.restore();
+    }
+  }
+}
+
+// ── Render all to offscreen ──
+function renderAll() {
+  const p = getParams();
+  const pal = PALETTES[currentPalette];
+
+  offCtx.fillStyle = p.frameOn ? getFrameColorHex() : pal.bg;
+  offCtx.fillRect(0, 0, artW, artH);
+
+  for (let i = 0; i < slices.length; i++) {
+    drawSlice(offCtx, i);
+  }
+
+  drawCracks(offCtx);
+}
+
+// ── Render to visible canvas ──
+function render() {
+  const fw = getFramePad();
+  updateCanvasSize();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (fw > 0) {
+    ctx.fillStyle = getFrameColorHex();
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  ctx.drawImage(offscreen, fw, fw);
+
+  // Frame overlay
+  if (fw > 0) {
+    const fc = getFrameColorHex();
+    const isBlack = frameColor === 'black';
+    ctx.save();
+    ctx.fillStyle = fc;
+    ctx.fillRect(0, 0, canvas.width, fw);
+    ctx.fillRect(0, canvas.height - fw, canvas.width, fw);
+    ctx.fillRect(0, 0, fw, canvas.height);
+    ctx.fillRect(canvas.width - fw, 0, fw, canvas.height);
+
+    ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(fw - 0.5, fw - 0.5, artW + 1, artH + 1);
+
+    ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(fw - 2, fw - 2, artW + 4, artH + 4);
+
+    ctx.strokeStyle = isBlack ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+
+    ctx.restore();
+  }
+}
+
+// ── Randomize ──
+function randomizeAll() {
+  const keys = Object.keys(PALETTES);
+  currentPalette = keys[Math.floor(Math.random() * keys.length)];
+  document.querySelectorAll('.palette-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.palette === currentPalette);
+  });
+
+  document.getElementById('sliceCount').value = 6 + Math.floor(Math.random() * 40);
+  document.getElementById('distort').value = (Math.random() * 1.6).toFixed(2);
+  document.getElementById('noiseOctaves').value = 2 + Math.floor(Math.random() * 5);
+  document.getElementById('widthVar').value = (Math.random() * 0.8).toFixed(2);
+  document.getElementById('negSpace').value = (Math.random() * 0.6).toFixed(2);
+  document.getElementById('grain').value = (Math.random() * 0.5).toFixed(2);
+  document.getElementById('cracks').value = Math.floor(Math.random() * 8);
+
+  const edges = ['organic', 'straight', 'jagged'];
+  setEdge(edges[Math.floor(Math.random() * edges.length)]);
+
+  const orients = ['vertical', 'horizontal', 'diagonal'];
+  setOrientation(orients[Math.floor(Math.random() * orients.length)]);
+
+  ['sliceCount','distort','noiseOctaves','widthVar','negSpace','grain','cracks'].forEach(id => {
+    document.getElementById(id).dispatchEvent(new Event('input'));
+  });
+
+  generate();
+}
+
+// ── Export ──
+function exportPNG() {
+  render();
+  const link = document.createElement('a');
+  link.download = 'slices-' + Date.now() + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  setStatus('PNG exported');
+}
+
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
