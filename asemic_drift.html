@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asemic Drift // 2026</title>
+    <style>
+        :root {
+            --bg: #080808;
+            --ink: #e0e0e0;
+            --accent: #ff3333;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        #ui {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            pointer-events: none;
+            mix-blend-mode: difference;
+        }
+
+        h1 {
+            font-size: 14px;
+            font-weight: normal;
+            letter-spacing: 2px;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .controls {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.6);
+            padding: 8px 12px;
+            font-family: inherit;
+            font-size: 10px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: right;
+        }
+
+        button:hover {
+            border-color: var(--ink);
+            color: var(--ink);
+        }
+
+        .meta {
+            font-size: 10px;
+            opacity: 0.5;
+            line-height: 1.4;
+        }
+
+        #signature {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            font-size: 10px;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>Asemic Drift</h1>
+        <div class="meta">
+            GEN: <span id="gen-id">0000</span><br>
+            MODE: GESTURAL_INTERFERENCE
+        </div>
+    </div>
+
+    <div class="controls">
+        <button onclick="reset()">Regenerate [R]</button>
+        <button onclick="toggleFlow()">Toggle Flow [SPACE]</button>
+        <button onclick="save()">Capture [S]</button>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="art"></canvas>
+    </div>
+
+    <div id="signature">OPENCLAW // VIKTOR</div>
+
+    <script>
+        const canvas = document.getElementById('art');
+        const ctx = canvas.getContext('2d');
+        const genId = document.getElementById('gen-id');
+
+        let width, height;
+        let particles = [];
+        let flowField = [];
+        let animationId;
+        let isFlowing = true;
+        let mouse = { x: 0, y: 0, active: false };
+        let cols, rows;
+        const scale = 20;
+        let zOff = 0;
+
+        // Configuration
+        const config = {
+            particleCount: 800,
+            noiseScale: 0.1,
+            speed: 0.8,
+            trail: 0.15, // Lower = longer trails
+            colorBase: 200 // Hue
+        };
+
+        // Simplex Noise (Minimal implementation)
+        const SimplexNoise = (function() {
+            // A fast, compact simplex noise implementation would go here. 
+            // For brevity in a single file, using a simple pseudo-random gradient noise.
+            // In a real production artifact, I'd embed the full library or a robust function.
+            // Using Math.sin/cos combinations for organic flow in this lightweight version.
+            return {
+                noise3D: function(x, y, z) {
+                    return Math.sin(x) * Math.cos(y) * Math.sin(z) + 
+                           Math.cos(x * 1.5) * Math.sin(y * 1.5) * 0.5;
+                }
+            };
+        })();
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = 0;
+                this.vy = 0;
+                this.history = [];
+                this.maxHistory = 10 + Math.random() * 20;
+                this.life = 1.0;
+                this.decay = 0.002 + Math.random() * 0.005;
+                this.width = 0.5 + Math.random() * 1.5;
+            }
+
+            update() {
+                // Calculate grid position
+                let x = Math.floor(this.x / scale);
+                let y = Math.floor(this.y / scale);
+                
+                // Safety check
+                if (x < 0 || x >= cols || y < 0 || y >= rows) {
+                    this.reset();
+                    return;
+                }
+
+                // Get force from flow field
+                let angle = flowField[x + y * cols];
+                
+                // Add mouse influence
+                if (mouse.active) {
+                    let dx = this.x - mouse.x;
+                    let dy = this.y - mouse.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 200) {
+                        angle += (200 - dist) * 0.01;
+                    }
+                }
+
+                this.vx += Math.cos(angle) * 0.1;
+                this.vy += Math.sin(angle) * 0.1;
+
+                // Limit speed
+                const vel = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                if (vel > 2) {
+                    this.vx = (this.vx / vel) * 2;
+                    this.vy = (this.vy / vel) * 2;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+
+                // Wrap around
+                if (this.x > width) this.x = 0;
+                if (this.x < 0) this.x = width;
+                if (this.y > height) this.y = 0;
+                if (this.y < 0) this.y = height;
+
+                // History for trails
+                this.history.push({x: this.x, y: this.y});
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                }
+
+                if (this.life <= 0) this.reset();
+            }
+
+            draw() {
+                if (this.history.length < 2) return;
+
+                ctx.beginPath();
+                ctx.moveTo(this.history[0].x, this.history[0].y);
+                for (let i = 1; i < this.history.length; i++) {
+                    ctx.lineTo(this.history[i].x, this.history[i].y);
+                }
+                
+                // Aesthetic: Asemic writing style (black/white/red)
+                const isAccent = Math.random() > 0.98;
+                ctx.strokeStyle = isAccent ? '#ff3333' : `rgba(220, 220, 220, ${this.life})`;
+                ctx.lineWidth = isAccent ? this.width * 2 : this.width;
+                ctx.stroke();
+            }
+        }
+
+        function init() {
+            // Set canvas size
+            const size = Math.min(window.innerWidth, window.innerHeight) * 0.9;
+            canvas.width = window.innerWidth * 0.9;
+            canvas.height = window.innerHeight * 0.9;
+            width = canvas.width;
+            height = canvas.height;
+
+            cols = Math.floor(width / scale) + 1;
+            rows = Math.floor(height / scale) + 1;
+
+            particles = [];
+            for (let i = 0; i < config.particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            genId.innerText = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            
+            // Clear background once
+            ctx.fillStyle = '#080808';
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        function updateFlowField() {
+            zOff += 0.005;
+            flowField = new Array(cols * rows);
+            
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    // Create noise value
+                    let angle = SimplexNoise.noise3D(x * config.noiseScale, y * config.noiseScale, zOff) * Math.PI * 4;
+                    flowField[x + y * cols] = angle;
+                    
+                    // Debug grid (optional, commented out)
+                    /*
+                    ctx.save();
+                    ctx.translate(x*scale, y*scale);
+                    ctx.rotate(angle);
+                    ctx.strokeStyle = 'rgba(50,50,50,0.1)';
+                    ctx.beginPath();
+                    ctx.moveTo(0,0);
+                    ctx.lineTo(scale,0);
+                    ctx.stroke();
+                    ctx.restore();
+                    */
+                }
+            }
+        }
+
+        function animate() {
+            if (!isFlowing) return;
+
+            // Trail effect (fade out)
+            ctx.fillStyle = `rgba(8, 8, 8, ${config.trail})`;
+            ctx.fillRect(0, 0, width, height);
+
+            updateFlowField();
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        // Controls
+        function reset() {
+            init();
+            ctx.fillStyle = '#080808';
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        function toggleFlow() {
+            isFlowing = !isFlowing;
+            if (isFlowing) animate();
+        }
+
+        function save() {
+            const link = document.createElement('a');
+            link.download = `asemic-drift-${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Interaction
+        window.addEventListener('resize', () => {
+            init();
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+            mouse.active = true;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            mouse.active = false;
+        });
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space') toggleFlow();
+            if (e.code === 'KeyR') reset();
+            if (e.code === 'KeyS') save();
+        });
+
+        // Start
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
