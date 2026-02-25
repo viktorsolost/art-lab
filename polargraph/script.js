@@ -186,6 +186,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Get brightness at this pixel
                 // Map screen coord to image data index
                 const idx = (Math.floor(py) * w + Math.floor(px)) * 4;
+                
+                // Ensure index is within bounds
+                if (idx < 0 || idx >= data.length) continue;
+
                 // Simple brightness (avg of RGB)
                 const r = data[idx];
                 const g = data[idx+1];
