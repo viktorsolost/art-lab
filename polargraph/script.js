@@ -74,14 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Draw faint background reference
             ctx.globalAlpha = 0.2;
             const aspect = sourceImage.width / sourceImage.height;
-            let drawW = machineWidth * 0.8;
-            let drawH = drawW / aspect;
+            let drawW = Math.floor(machineWidth * 0.8);
+            let drawH = Math.floor(drawW / aspect);
             if (drawH > machineHeight * 0.8) {
-                drawH = machineHeight * 0.8;
-                drawW = drawH * aspect;
+                drawH = Math.floor(machineHeight * 0.8);
+                drawW = Math.floor(drawH * aspect);
             }
-            const x = (machineWidth - drawW) / 2;
-            const y = (machineHeight - drawH) / 2;
+            const x = Math.floor((machineWidth - drawW) / 2);
+            const y = Math.floor((machineHeight - drawH) / 2);
             ctx.drawImage(sourceImage, x, y, drawW, drawH);
             ctx.globalAlpha = 1.0;
         }
@@ -125,16 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Calculate dimensions to center image
                 const aspect = img.width / img.height;
-                let drawW = machineWidth * 0.8;
-                let drawH = drawW / aspect;
+                let drawW = Math.floor(machineWidth * 0.8);
+                let drawH = Math.floor(drawW / aspect);
                 
                 if (drawH > machineHeight * 0.8) {
-                    drawH = machineHeight * 0.8;
-                    drawW = drawH * aspect;
+                    drawH = Math.floor(machineHeight * 0.8);
+                    drawW = Math.floor(drawH * aspect);
                 }
                 
-                const x = (machineWidth - drawW) / 2;
-                const y = (machineHeight - drawH) / 2;
+                const x = Math.floor((machineWidth - drawW) / 2);
+                const y = Math.floor((machineHeight - drawH) / 2);
 
                 // Process image to generate path (Sine Wave Modulation)
                 updateGCodePreview(`Processing image...`);
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentPath = generateSinePath(imgData, x, y, drawW, drawH);
                 
                 redraw();
-                updateGCodePreview(`Loaded: ${file.name}\nGenerated ${currentPath.length} points.`);
+                updateGCodePreview(`Loaded: ${file.name}\nSize: ${drawW}x${drawH}\nGenerated ${currentPath.length} points.`);
             };
             img.src = event.target.result;
         };
@@ -169,6 +169,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateSinePath(imgData, offsetX, offsetY, w, h) {
         const path = [];
         const data = imgData.data;
+        // Use imgData.width for correct stride, not w (though they should be equal now)
+        const strideWidth = imgData.width;
         const lineSpacing = 10; // mm between lines
         const resolution = 2; // Check pixel every 2mm
         const maxAmplitude = lineSpacing / 2;
@@ -178,22 +180,31 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Zigzag direction
             const isRight = (py / lineSpacing) % 2 === 0;
-            const startX = isRight ? 0 : w;
-            const endX = isRight ? w : 0;
+            // Ensure integer bounds
+            const startX = isRight ? 0 : w - 1;
+            const endX = isRight ? w : -1;
             const step = isRight ? resolution : -resolution;
 
-            for (let px = startX; (isRight ? px < w : px > 0); px += step) {
-                // Get brightness at this pixel
-                // Map screen coord to image data index
-                const idx = (Math.floor(py) * w + Math.floor(px)) * 4;
+            // Iterate over width
+            for (let px = startX; (isRight ? px < endX : px > endX); px += step) {
                 
-                // Ensure index is within bounds
-                if (idx < 0 || idx >= data.length) continue;
+                // Map to pixel coordinates
+                const pixelX = Math.floor(px);
+                const pixelY = Math.floor(py);
 
-                // Simple brightness (avg of RGB)
+                // Boundary check
+                if (pixelX < 0 || pixelX >= strideWidth || pixelY < 0 || pixelY >= h) continue;
+
+                // Calculate index
+                const idx = (pixelY * strideWidth + pixelX) * 4;
+                
+                // Get brightness
                 const r = data[idx];
                 const g = data[idx+1];
                 const b = data[idx+2];
+                // If undefined, treat as white
+                if (r === undefined) continue;
+
                 const brightness = (r + g + b) / 3; // 0-255
                 
                 // Invert: Darker = More wave
