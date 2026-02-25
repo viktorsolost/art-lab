@@ -16,17 +16,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let machineWidth = parseInt(machineWidthInput.value);
     let machineHeight = parseInt(machineHeightInput.value);
-    let scale = 0.5; // Initial scale for canvas display
     let isConnected = false;
     let isPlotting = false;
     let isPaused = false;
     let plotSpeed = parseInt(speedInput.value);
     let currentPath = [];
     let animationId = null;
+    let sourceImage = null; // Store the loaded image
 
-    // Resize canvas based on machine dimensions and window size
+    // Allow JPG/PNG/SVG in file picker
+    fileInput.accept = ".jpg, .jpeg, .png, .svg";
+
     function resizeCanvas() {
         const container = document.getElementById('canvas-container');
+        if (!container) return;
         const aspect = machineWidth / machineHeight;
         let w = container.clientWidth * 0.9;
         let h = w / aspect;
@@ -36,16 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
             w = h * aspect;
         }
 
-        canvas.width = machineWidth; // Internal resolution matches machine dimensions
+        canvas.width = machineWidth;
         canvas.height = machineHeight;
         canvas.style.width = `${w}px`;
         canvas.style.height = `${h}px`;
         
-        // Redraw content if any
-        drawGrid();
-        if (currentPath.length > 0) {
-            drawPath(currentPath);
-        }
+        redraw();
     }
 
     window.addEventListener('resize', resizeCanvas);
@@ -55,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeStyle = '#eee';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        const gridSize = 50; // 50mm grid
+        const gridSize = 50; 
         for (let x = 0; x <= machineWidth; x += gridSize) {
             ctx.moveTo(x, 0);
             ctx.lineTo(x, machineHeight);
@@ -67,7 +66,32 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.stroke();
     }
 
-    // Connect via Web Serial (Placeholder for now)
+    function redraw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+        
+        if (sourceImage) {
+            // Draw faint background reference
+            ctx.globalAlpha = 0.2;
+            const aspect = sourceImage.width / sourceImage.height;
+            let drawW = machineWidth * 0.8;
+            let drawH = drawW / aspect;
+            if (drawH > machineHeight * 0.8) {
+                drawH = machineHeight * 0.8;
+                drawW = drawH * aspect;
+            }
+            const x = (machineWidth - drawW) / 2;
+            const y = (machineHeight - drawH) / 2;
+            ctx.drawImage(sourceImage, x, y, drawW, drawH);
+            ctx.globalAlpha = 1.0;
+        }
+
+        if (currentPath.length > 0) {
+            drawPath(currentPath);
+        }
+    }
+
+    // Connect via Web Serial
     connectBtn.addEventListener('click', async () => {
         if ('serial' in navigator) {
             try {
@@ -97,11 +121,9 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (event) => {
             const img = new Image();
             img.onload = () => {
-                // Clear and redraw grid
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                drawGrid();
+                sourceImage = img;
                 
-                // Draw image centered and scaled to fit
+                // Calculate dimensions to center image
                 const aspect = img.width / img.height;
                 let drawW = machineWidth * 0.8;
                 let drawH = drawW / aspect;
@@ -113,13 +135,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const x = (machineWidth - drawW) / 2;
                 const y = (machineHeight - drawH) / 2;
+
+                // Process image to generate path (Sine Wave Modulation)
+                updateGCodePreview(`Processing image...`);
                 
-                ctx.drawImage(img, x, y, drawW, drawH);
+                // Use a temporary canvas to read pixel data
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = drawW;
+                tempCanvas.height = drawH;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(img, 0, 0, drawW, drawH);
+                const imgData = tempCtx.getImageData(0, 0, drawW, drawH);
                 
-                // For SVG, we might want to extract paths later
-                // Here we just display it as a reference image for "plotting" simulation
-                currentPath = generateSimulatedPath(x, y, drawW, drawH);
-                updateGCodePreview(`Loaded image: ${file.name}\nDimensions: ${img.width}x${img.height}`);
+                currentPath = generateSinePath(imgData, x, y, drawW, drawH);
+                
+                redraw();
+                updateGCodePreview(`Loaded: ${file.name}\nGenerated ${currentPath.length} points.`);
             };
             img.src = event.target.result;
         };
@@ -127,23 +158,57 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     clearBtn.addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawGrid();
+        sourceImage = null;
         currentPath = [];
+        redraw();
         updateGCodePreview("Canvas cleared.");
     });
 
-    // Generate a simple simulated path (e.g., zigzag fill) for demonstration
-    function generateSimulatedPath(x, y, w, h) {
+    // ALGORITHM: Modulated Sine Waves
+    // Darker pixels = Higher frequency/amplitude waves
+    function generateSinePath(imgData, offsetX, offsetY, w, h) {
         const path = [];
-        const step = 10; // mm
-        for (let py = y; py < y + h; py += step) {
-            if (((py - y) / step) % 2 === 0) {
-                path.push({ x: x, y: py });
-                path.push({ x: x + w, y: py });
-            } else {
-                path.push({ x: x + w, y: py });
-                path.push({ x: x, y: py });
+        const data = imgData.data;
+        const lineSpacing = 10; // mm between lines
+        const resolution = 2; // Check pixel every 2mm
+        const maxAmplitude = lineSpacing / 2;
+
+        for (let py = 0; py < h; py += lineSpacing) {
+            const yBase = offsetY + py;
+            
+            // Zigzag direction
+            const isRight = (py / lineSpacing) % 2 === 0;
+            const startX = isRight ? 0 : w;
+            const endX = isRight ? w : 0;
+            const step = isRight ? resolution : -resolution;
+
+            for (let px = startX; (isRight ? px < w : px > 0); px += step) {
+                // Get brightness at this pixel
+                // Map screen coord to image data index
+                const idx = (Math.floor(py) * w + Math.floor(px)) * 4;
+                // Simple brightness (avg of RGB)
+                const r = data[idx];
+                const g = data[idx+1];
+                const b = data[idx+2];
+                const brightness = (r + g + b) / 3; // 0-255
+                
+                // Invert: Darker = More wave
+                const darkness = 1 - (brightness / 255);
+                
+                // Modulation
+                // Amplitude based on darkness (0 to maxAmplitude)
+                const amp = darkness * maxAmplitude;
+                
+                // Frequency could also modulate, but let's keep it simple for now
+                const freq = 0.5; 
+                
+                // Calculate wave offset
+                const waveY = Math.sin(px * freq) * amp;
+                
+                path.push({
+                    x: offsetX + px,
+                    y: yBase + waveY
+                });
             }
         }
         return path;
@@ -151,8 +216,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawPath(path) {
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000'; // Ink color
+        ctx.lineWidth = 1.5;
         if (path.length > 0) {
             ctx.moveTo(path[0].x, path[0].y);
             for (let i = 1; i < path.length; i++) {
@@ -164,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     plotBtn.addEventListener('click', () => {
         if (currentPath.length === 0) {
-            alert("No drawing loaded!");
+            alert("No path generated! Load an image first.");
             return;
         }
         if (isPlotting) return;
@@ -185,10 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isPaused = false;
         cancelAnimationFrame(animationId);
         updateGCodePreview("Plot stopped.");
-        // Redraw full path immediately or clear? Let's just redraw grid + full image
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawGrid();
-        // Ideally reload image, but for now just grid
+        redraw();
     });
 
     speedInput.addEventListener('input', (e) => {
@@ -208,40 +270,26 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Draw segment
+        // Draw segment (Plotter head visualization)
         const p1 = currentPath[index];
         const p2 = currentPath[index + 1];
         
         ctx.beginPath();
-        ctx.strokeStyle = '#f0f'; // Plotter head color
+        ctx.strokeStyle = '#f0f'; // Plotter head color (magenta)
         ctx.lineWidth = 3;
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
         ctx.stroke();
 
         // Simulate G-code output
-        if (index % 10 === 0) {
-            updateGCodePreview(`G1 X${p2.x.toFixed(2)} Y${p2.y.toFixed(2)} F${plotSpeed * 100}`);
+        if (index % 20 === 0) {
+            updateGCodePreview(`G1 X${p2.x.toFixed(1)} Y${p2.y.toFixed(1)}`);
         }
 
-        // Calculate next frame based on speed
-        // Simple linear interpolation could go here, but frame-by-point for now
-        let nextIndex = index + 1;
-        
-        // Speed simulation: skip points if speed is high
-        if (plotSpeed > 50) {
-             nextIndex += Math.floor((plotSpeed - 50) / 10);
-             if (nextIndex >= currentPath.length - 1) nextIndex = currentPath.length - 2;
-        }
+        let nextIndex = index + Math.ceil(plotSpeed / 10);
+        if (nextIndex >= currentPath.length) nextIndex = currentPath.length - 1;
 
-        // Visual delay for slow speed
-        if (plotSpeed < 20) {
-            setTimeout(() => {
-                animationId = requestAnimationFrame(() => animatePlot(nextIndex));
-            }, (20 - plotSpeed) * 10);
-        } else {
-            animationId = requestAnimationFrame(() => animatePlot(nextIndex));
-        }
+        animationId = requestAnimationFrame(() => animatePlot(nextIndex));
     }
 
     function updateGCodePreview(text) {
@@ -249,8 +297,6 @@ document.addEventListener('DOMContentLoaded', () => {
         line.textContent = text;
         gcodePreview.appendChild(line);
         gcodePreview.scrollTop = gcodePreview.scrollHeight;
-        
-        // Limit log size
         while (gcodePreview.children.length > 50) {
             gcodePreview.removeChild(gcodePreview.firstChild);
         }
